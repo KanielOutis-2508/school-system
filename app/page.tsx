@@ -1,65 +1,151 @@
-import Image from "next/image";
+'use client';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function Home() {
+export default function LoginPage() {
+  const router = useRouter();
+  const [form, setForm] = useState({ unique_id: '', password: '' });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error);
+        setLoading(false);
+        return;
+      }
+
+      // Redirect based on role
+      if (data.role === 'admin') router.push('/dashboard/admin');
+      else if (data.role === 'teacher') router.push('/dashboard/teacher');
+      else if (data.role === 'student') router.push('/dashboard/student');
+
+    } catch {
+      setError('Something went wrong. Please try again.');
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <main style={{
+      minHeight: '100vh',
+      background: '#F8F9FA',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: 'Inter, sans-serif',
+    }}>
+      <div style={{
+        background: 'white',
+        borderRadius: 12,
+        padding: '48px 40px',
+        width: '100%',
+        maxWidth: 420,
+        boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
+      }}>
+        {/* Logo */}
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 12,
+            background: '#1a56db', margin: '0 auto 12px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <span style={{ color: 'white', fontSize: 22, fontWeight: 700 }}>N</span>
+          </div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: '#111827', margin: 0 }}>
+            Nazareth School
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p style={{ fontSize: 14, color: '#6B7280', marginTop: 4 }}>
+            Student Management System
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        {/* Form */}
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div>
+            <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
+              Unique ID
+            </label>
+            <input
+              required
+              type="text"
+              value={form.unique_id}
+              onChange={e => setForm(f => ({ ...f, unique_id: e.target.value }))}
+              placeholder="e.g. NAZ-ADMIN-001"
+              style={{
+                width: '100%', padding: '10px 14px',
+                border: '1.5px solid #E5E7EB', borderRadius: 8,
+                fontSize: 14, color: '#111827', outline: 'none',
+                boxSizing: 'border-box', transition: 'border-color 0.2s',
+              }}
+              onFocus={e => (e.target.style.borderColor = '#1a56db')}
+              onBlur={e => (e.target.style.borderColor = '#E5E7EB')}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          </div>
+
+          <div>
+            <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
+              Password
+            </label>
+            <input
+              required
+              type="password"
+              value={form.password}
+              onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+              placeholder="Enter your password"
+              style={{
+                width: '100%', padding: '10px 14px',
+                border: '1.5px solid #E5E7EB', borderRadius: 8,
+                fontSize: 14, color: '#111827', outline: 'none',
+                boxSizing: 'border-box', transition: 'border-color 0.2s',
+              }}
+              onFocus={e => (e.target.style.borderColor = '#1a56db')}
+              onBlur={e => (e.target.style.borderColor = '#E5E7EB')}
+            />
+          </div>
+
+          {error && (
+            <div style={{
+              background: '#FEF2F2', border: '1px solid #FECACA',
+              borderRadius: 8, padding: '10px 14px',
+              fontSize: 13, color: '#DC2626',
+            }}>
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              background: loading ? '#93C5FD' : '#1a56db',
+              color: 'white', border: 'none', borderRadius: 8,
+              padding: '12px', fontSize: 14, fontWeight: 600,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              transition: 'background 0.2s',
+            }}
           >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            {loading ? 'Signing in...' : 'Sign In'}
+          </button>
+        </form>
+
+        <p style={{ textAlign: 'center', fontSize: 12, color: '#9CA3AF', marginTop: 24 }}>
+          Contact your administrator if you need access.
+        </p>
+      </div>
+    </main>
   );
 }
