@@ -1,0 +1,32 @@
+import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { verifyToken } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
+
+export async function GET() {
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const payload = verifyToken(token);
+    if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { data: teacher } = await supabase
+      .from('users')
+      .select('class_id')
+      .eq('id', payload.id)
+      .single();
+
+    const { data: students } = await supabase
+      .from('users')
+      .select('*, student_profiles(*)')
+      .eq('class_id', teacher?.class_id)
+      .eq('role', 'student')
+      .order('full_name');
+
+    return NextResponse.json({ students: students ?? [] });
+  } catch {
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  }
+}

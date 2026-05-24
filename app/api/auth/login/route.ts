@@ -7,9 +7,7 @@ export async function POST(request: NextRequest) {
   try {
     const { unique_id, password } = await request.json();
 
-    if (!unique_id || !password) {
-      return NextResponse.json({ error: 'ID and password required' }, { status: 400 });
-    }
+    console.log('Login attempt:', unique_id);
 
     // Find user by unique ID
     const { data: user, error } = await supabase
@@ -18,20 +16,24 @@ export async function POST(request: NextRequest) {
       .eq('unique_id', unique_id.toUpperCase())
       .single();
 
+    console.log('User found:', user);
+    console.log('DB error:', error);
+
     if (error || !user) {
-      return NextResponse.json({ error: 'Invalid ID or password' }, { status: 401 });
+      return NextResponse.json({ error: 'Invalid ID or password', debug: 'user not found' }, { status: 401 });
     }
 
     // Check password
     const validPassword = await bcrypt.compare(password, user.password_hash);
+    console.log('Password valid:', validPassword);
+    console.log('Hash in DB:', user.password_hash);
+
     if (!validPassword) {
-      return NextResponse.json({ error: 'Invalid ID or password' }, { status: 401 });
+      return NextResponse.json({ error: 'Invalid ID or password', debug: 'wrong password' }, { status: 401 });
     }
 
-    // Sign JWT token
     const token = signToken({ id: user.id, role: user.role, unique_id: user.unique_id });
 
-    // Set cookie
     const response = NextResponse.json({
       success: true,
       role: user.role,
@@ -42,7 +44,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 60 * 60 * 8, // 8 hours
+      maxAge: 60 * 60 * 8,
     });
 
     return response;
