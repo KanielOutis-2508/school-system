@@ -1,6 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
-import { useState, useEffect } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 
 const TABS = ['Overview', 'Students', 'Results', 'Behaviour', 'Assignments', 'Attendance'];
@@ -138,7 +138,11 @@ function ClassStudents({ teacher }: { teacher: any }) {
 function EnterResults({ teacher }: { teacher: any }) {
   const [students, setStudents] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
-  const [form, setForm] = useState({ student_id: '', subject_id: '', term: 'first', score: '' });
+  const [form, setForm] = useState({
+    student_id: '', subject_id: '', term: 'first',
+    exam_score: '', test_score: '', midterm_score: '',
+    classwork_score: '', assignment_score: '', note_score: '',
+  });
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -148,51 +152,114 @@ function EnterResults({ teacher }: { teacher: any }) {
     fetch('/api/teacher/subjects').then(r => r.json()).then(d => { if (d.subjects) setSubjects(d.subjects); });
   }, [teacher]);
 
+  // Auto calculate total
+ const total = useMemo(() => {
+  return (
+    Number(form.exam_score || 0) +
+    Number(form.test_score || 0) +
+    Number(form.midterm_score || 0) +
+    Number(form.classwork_score || 0) +
+    Number(form.assignment_score || 0) +
+    Number(form.note_score || 0)
+  );
+}, [form]);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const res = await fetch('/api/teacher/results', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+    const res = await fetch('/api/teacher/results', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    });
     const data = await res.json();
-    setMsg(res.ok ? 'Result saved!' : data.error);
+    if (res.ok) {
+      setMsg(`Result saved! Total: ${data.total}/100 — Grade: ${data.grade}`);
+    } else {
+      setMsg(data.error);
+    }
     setLoading(false);
   };
 
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '9px 12px',
+    border: '1.5px solid #E5E7EB', borderRadius: 7,
+    fontSize: 13, outline: 'none', boxSizing: 'border-box', color: '#111827',
+  };
+
+  const scoreFields = [
+    { label: 'Exam Score', key: 'exam_score', max: 40 },
+    { label: 'Test Score', key: 'test_score', max: 20 },
+    { label: 'Mid Term Project', key: 'midterm_score', max: 10 },
+    { label: 'Classwork Score', key: 'classwork_score', max: 10 },
+    { label: 'Assignment Score', key: 'assignment_score', max: 10 },
+    { label: 'Note Score', key: 'note_score', max: 10 },
+  ];
+
   return (
-    <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', maxWidth: 500 }}>
+    <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', maxWidth: 560 }}>
       <h3 style={{ fontSize: 15, fontWeight: 600, color: '#111827', marginBottom: 20 }}>Enter Student Result</h3>
       <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        {/* Student */}
         <div>
           <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Student</label>
-          <select required value={form.student_id} onChange={e => setForm(p => ({ ...p, student_id: e.target.value }))}
-            style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E5E7EB', borderRadius: 7, fontSize: 13, outline: 'none' }}>
+          <select required value={form.student_id} onChange={e => setForm(p => ({ ...p, student_id: e.target.value }))} style={inputStyle}>
             <option value="">Select student</option>
             {students.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
           </select>
         </div>
+
+        {/* Subject */}
         <div>
           <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Subject</label>
-          <select required value={form.subject_id} onChange={e => setForm(p => ({ ...p, subject_id: e.target.value }))}
-            style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E5E7EB', borderRadius: 7, fontSize: 13, outline: 'none' }}>
+          <select required value={form.subject_id} onChange={e => setForm(p => ({ ...p, subject_id: e.target.value }))} style={inputStyle}>
             <option value="">Select subject</option>
             {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
+
+        {/* Term */}
         <div>
           <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Term</label>
-          <select value={form.term} onChange={e => setForm(p => ({ ...p, term: e.target.value }))}
-            style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E5E7EB', borderRadius: 7, fontSize: 13, outline: 'none' }}>
+          <select value={form.term} onChange={e => setForm(p => ({ ...p, term: e.target.value }))} style={inputStyle}>
             <option value="first">First Term</option>
             <option value="second">Second Term</option>
             <option value="third">Third Term</option>
           </select>
         </div>
-        <div>
-          <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Score (0-100)</label>
-          <input required type="number" min="0" max="100" value={form.score} onChange={e => setForm(p => ({ ...p, score: e.target.value }))}
-            placeholder="e.g. 85"
-            style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E5E7EB', borderRadius: 7, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+
+        {/* Score fields */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {scoreFields.map(f => (
+            <div key={f.key}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>
+                {f.label} <span style={{ color: '#9CA3AF', fontWeight: 400 }}>(max {f.max})</span>
+              </label>
+              <input
+                type="number" min="0" max={f.max}
+                value={(form as any)[f.key]}
+                onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+                placeholder="0"
+                style={inputStyle}
+              />
+            </div>
+          ))}
         </div>
-        {msg && <p style={{ fontSize: 12, color: msg === 'Result saved!' ? '#059669' : '#DC2626' }}>{msg}</p>}
+
+        {/* Live total */}
+        <div style={{
+          background: total >= 70 ? '#ECFDF5' : total >= 50 ? '#EFF6FF' : total >= 40 ? '#FFFBEB' : '#FEF2F2',
+          borderRadius: 8, padding: '14px 16px',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Total Score</span>
+          <span style={{ fontSize: 22, fontWeight: 700, color: total >= 70 ? '#059669' : total >= 50 ? '#1a56db' : total >= 40 ? '#D97706' : '#DC2626' }}>
+            {total} / 100
+          </span>
+        </div>
+
+        {msg && <p style={{ fontSize: 12, color: msg.includes('saved') ? '#059669' : '#DC2626' }}>{msg}</p>}
+
         <button type="submit" disabled={loading} style={{ background: '#059669', color: 'white', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
           {loading ? 'Saving...' : 'Save Result'}
         </button>

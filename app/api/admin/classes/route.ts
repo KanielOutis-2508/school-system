@@ -8,16 +8,22 @@ export async function GET() {
       .select('*')
       .order('name');
 
+    console.log('Classes fetch:', classes, error);
+
     if (error) throw error;
     return NextResponse.json({ classes });
-  } catch {
+  } catch (err) {
+    console.error('Classes GET error:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { name } = await request.json();
+    const body = await request.json();
+    console.log('Creating class:', body);
+
+    const { name } = body;
 
     if (!name) {
       return NextResponse.json({ error: 'Class name required' }, { status: 400 });
@@ -29,9 +35,12 @@ export async function POST(request: NextRequest) {
       .select()
       .single();
 
+    console.log('Class created:', data, 'Error:', error);
+
     if (error) throw error;
     return NextResponse.json({ class: data });
-  } catch {
+  } catch (err) {
+    console.error('Classes POST error:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

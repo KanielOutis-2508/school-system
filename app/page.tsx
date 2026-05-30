@@ -7,6 +7,7 @@ export default function LoginPage() {
   const [form, setForm] = useState({ unique_id: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +29,6 @@ export default function LoginPage() {
         return;
       }
 
-      // Redirect based on role
       if (data.role === 'admin') router.push('/dashboard/admin');
       else if (data.role === 'teacher') router.push('/dashboard/teacher');
       else if (data.role === 'student') router.push('/dashboard/student');
@@ -100,21 +100,35 @@ export default function LoginPage() {
             <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
               Password
             </label>
-            <input
-              required
-              type="password"
-              value={form.password}
-              onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-              placeholder="Enter your password"
-              style={{
-                width: '100%', padding: '10px 14px',
-                border: '1.5px solid #E5E7EB', borderRadius: 8,
-                fontSize: 14, color: '#111827', outline: 'none',
-                boxSizing: 'border-box', transition: 'border-color 0.2s',
-              }}
-              onFocus={e => (e.target.style.borderColor = '#1a56db')}
-              onBlur={e => (e.target.style.borderColor = '#E5E7EB')}
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                required
+                type={showPassword ? 'text' : 'password'}
+                value={form.password}
+                onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                placeholder="Enter your password"
+                style={{
+                  width: '100%', padding: '10px 44px 10px 14px',
+                  border: '1.5px solid #E5E7EB', borderRadius: 8,
+                  fontSize: 14, color: '#111827', outline: 'none',
+                  boxSizing: 'border-box', transition: 'border-color 0.2s',
+                }}
+                onFocus={e => (e.target.style.borderColor = '#1a56db')}
+                onBlur={e => (e.target.style.borderColor = '#E5E7EB')}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(s => !s)}
+                style={{
+                  position: 'absolute', right: 12, top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: 13, color: '#6B7280', padding: 0,
+                }}
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
           </div>
 
           {error && (
