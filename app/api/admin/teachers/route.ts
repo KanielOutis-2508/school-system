@@ -24,19 +24,26 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { full_name, email, password, class_id } = await request.json();
+    const { full_name, email, password, class_id, username } = await request.json();
 
-    if (!full_name || !password) {
-      return NextResponse.json({ error: 'Name and password required' }, { status: 400 });
+    if (!full_name || !password || !username) {
+      return NextResponse.json({ error: 'Name, username and password required' }, { status: 400 });
     }
 
-    // Hash password
+    // Check username not taken
+    const { data: existing } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username.toLowerCase())
+      .single();
+
+    if (existing) {
+      return NextResponse.json({ error: 'Username already taken' }, { status: 400 });
+    }
+
     const password_hash = await bcrypt.hash(password, 10);
 
-    // Generate unique ID
     let unique_id = generateTeacherId();
-
-    // Make sure ID is unique
     let exists = true;
     while (exists) {
       const { data } = await supabase
@@ -56,6 +63,7 @@ export async function POST(request: NextRequest) {
         password_hash,
         role: 'teacher',
         unique_id,
+        username: username.toLowerCase(),
         class_id: class_id || null,
       })
       .select()

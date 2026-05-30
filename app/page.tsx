@@ -77,14 +77,14 @@ export default function LoginPage() {
         <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div>
             <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
-              Unique ID
+              Unique ID or Username
             </label>
             <input
               required
               type="text"
               value={form.unique_id}
               onChange={e => setForm(f => ({ ...f, unique_id: e.target.value }))}
-              placeholder="e.g. NAZ-ADMIN-001"
+              placeholder="ID or username"
               style={{
                 width: '100%', padding: '10px 14px',
                 border: '1.5px solid #E5E7EB', borderRadius: 8,

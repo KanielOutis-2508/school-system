@@ -90,7 +90,7 @@ export default function AdminDashboard() {
 function TeachersTab() {
   const [teachers, setTeachers] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
-  const [form, setForm] = useState({ full_name: '', email: '', class_id: '', password: '' });
+const [form, setForm] = useState({ full_name: '', username: '', email: '', class_id: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -108,7 +108,7 @@ function TeachersTab() {
     if (res.ok) {
       setMsg(`Teacher added! ID: ${data.unique_id}`);
       setTeachers(t => [...t, data.teacher]);
-      setForm({ full_name: '', email: '', class_id: '', password: '' });
+      setForm({ full_name: '', username: '', email: '', class_id: '', password: '' });
     } else { setMsg(data.error); }
     setLoading(false);
   };
@@ -122,7 +122,8 @@ function TeachersTab() {
         <form onSubmit={addTeacher} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {[
             { label: 'Full Name', key: 'full_name', type: 'text', placeholder: 'e.g. Mrs. Johnson' },
-            { label: 'Email', key: 'email', type: 'email', placeholder: 'teacher@school.com' },
+            { label: 'Username', key: 'username', type: 'text', placeholder: 'e.g. mrs.johnson' },
+          { label: 'Email', key: 'email', type: 'email', placeholder: 'teacher@school.com' },
           ].map(f => (
             <div key={f.key}>
               <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>{f.label}</label>

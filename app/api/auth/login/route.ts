@@ -7,29 +7,37 @@ export async function POST(request: NextRequest) {
   try {
     const { unique_id, password } = await request.json();
 
-    console.log('Login attempt:', unique_id);
+    if (!unique_id || !password) {
+      return NextResponse.json({ error: 'ID and password required' }, { status: 400 });
+    }
 
-    // Find user by unique ID
-    const { data: user, error } = await supabase
+    // Try finding by unique_id first, then by username
+    let user = null;
+
+    const { data: byId } = await supabase
       .from('users')
       .select('*')
       .eq('unique_id', unique_id.toUpperCase())
       .single();
 
-    console.log('User found:', user);
-    console.log('DB error:', error);
-
-    if (error || !user) {
-      return NextResponse.json({ error: 'Invalid ID or password', debug: 'user not found' }, { status: 401 });
+    if (byId) {
+      user = byId;
+    } else {
+      const { data: byUsername } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username', unique_id.toLowerCase())
+        .single();
+      if (byUsername) user = byUsername;
     }
 
-    // Check password
-    const validPassword = await bcrypt.compare(password, user.password_hash);
-    console.log('Password valid:', validPassword);
-    console.log('Hash in DB:', user.password_hash);
+    if (!user) {
+      return NextResponse.json({ error: 'Invalid ID or password' }, { status: 401 });
+    }
 
+    const validPassword = await bcrypt.compare(password, user.password_hash);
     if (!validPassword) {
-      return NextResponse.json({ error: 'Invalid ID or password', debug: 'wrong password' }, { status: 401 });
+      return NextResponse.json({ error: 'Invalid ID or password' }, { status: 401 });
     }
 
     const token = signToken({ id: user.id, role: user.role, unique_id: user.unique_id });
