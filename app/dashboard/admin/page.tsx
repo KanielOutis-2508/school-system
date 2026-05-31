@@ -162,14 +162,29 @@ const [form, setForm] = useState({ full_name: '', username: '', email: '', class
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {teachers.length === 0 && <p style={{ fontSize: 13, color: '#9CA3AF' }}>No teachers yet.</p>}
           {teachers.map(t => (
-            <div key={t.id} style={{ padding: '12px 14px', background: '#F9FAFB', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{t.full_name}</div>
-                <div style={{ fontSize: 11, color: '#6B7280' }}>{t.unique_id}</div>
-              </div>
-              <span style={{ fontSize: 11, background: '#EFF6FF', color: '#1a56db', padding: '3px 8px', borderRadius: 4 }}>Teacher</span>
-            </div>
-          ))}
+  <div key={t.id} style={{ padding: '12px 14px', background: '#F9FAFB', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{t.full_name}</div>
+      <div style={{ fontSize: 11, color: '#6B7280' }}>{t.unique_id} {t.username ? `· @${t.username}` : ''}</div>
+    </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <span style={{ fontSize: 11, background: '#EFF6FF', color: '#1a56db', padding: '3px 8px', borderRadius: 4 }}>Teacher</span>
+      <button
+        onClick={async () => {
+          if (!confirm(`Remove ${t.full_name}?`)) return;
+          const res = await fetch('/api/admin/teachers', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: t.id }),
+          });
+          if (res.ok) setTeachers(prev => prev.filter(x => x.id !== t.id));
+        }}
+        style={{ fontSize: 11, background: '#FEF2F2', color: '#DC2626', border: 'none', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}>
+        Remove
+      </button>
+    </div>
+  </div>
+))}
         </div>
       </div>
     </div>
