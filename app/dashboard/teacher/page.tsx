@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 
-const TABS = ['Overview', 'Students', 'Results', 'Behaviour', 'Assignments', 'Attendance'];
+const TABS = ['Overview', 'Students', 'Add Student', 'Results', 'Behaviour', 'Assignments', 'Attendance'];
 
 export default function TeacherDashboard() {
   const router = useRouter();
@@ -64,6 +64,7 @@ export default function TeacherDashboard() {
         {activeTab === 'Behaviour' && <EnterBehaviour teacher={teacher} />}
         {activeTab === 'Assignments' && <ManageAssignments teacher={teacher} />}
         {activeTab === 'Attendance' && <TakeAttendance teacher={teacher} />}
+        {activeTab === 'Add Student' && <AddStudentTab teacher={teacher} />}
       </div>
     </main>
   );
@@ -117,18 +118,31 @@ function ClassStudents({ teacher }: { teacher: any }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {students.length === 0 && <p style={{ fontSize: 13, color: '#9CA3AF' }}>No students in your class yet.</p>}
         {students.map(s => (
-          <div key={s.id} style={{ padding: '14px 16px', background: '#F9FAFB', borderRadius: 8, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, alignItems: 'center' }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{s.full_name}</div>
-              <div style={{ fontSize: 11, color: '#6B7280' }}>{s.unique_id}</div>
+          <div key={s.id} style={{ padding: '14px 16px', background: '#F9FAFB', borderRadius: 8, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 16, alignItems: 'center' }}>
+         <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{s.full_name}</div>
+           <div style={{ fontSize: 11, color: '#6B7280' }}>{s.unique_id}</div>
             </div>
             <div style={{ fontSize: 12, color: '#6B7280' }}>
-              {s.student_profiles?.[0]?.parent_phone || '—'}
-            </div>
-            <div style={{ fontSize: 12, color: '#6B7280', textAlign: 'right' }}>
-              {s.student_profiles?.[0]?.dismissal_method === 'alone' ? '🚶 Goes home alone' : '🚗 Parent pickup'}
-            </div>
+       {s.student_profiles?.[0]?.parent_phone || '—'}
           </div>
+        <div style={{ fontSize: 12, color: '#6B7280' }}>
+      {s.student_profiles?.[0]?.dismissal_method === 'alone' ? '🚶 Goes home alone' : '🚗 Parent pickup'}
+    </div>
+    <button
+      onClick={async () => {
+        if (!confirm(`Remove ${s.full_name}?`)) return;
+        const res = await fetch('/api/admin/students', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: s.id }),
+            });
+             if (res.ok) setStudents(prev => prev.filter(x => x.id !== s.id));
+             }}
+            style={{ fontSize: 11, background: '#FEF2F2', color: '#DC2626', border: 'none', borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>
+           Remove
+          </button>
+        </div>
         ))}
       </div>
     </div>
@@ -482,6 +496,111 @@ function TakeAttendance({ teacher }: { teacher: any }) {
         <button type="submit" disabled={loading || students.length === 0}
           style={{ background: '#059669', color: 'white', border: 'none', borderRadius: 8, padding: '10px 24px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
           {loading ? 'Saving...' : 'Save Attendance'}
+        </button>
+      </form>
+    </div>
+  );
+}
+function AddStudentTab({ teacher }: { teacher: any }) {
+  const [classes, setClasses] = useState<any[]>([]);
+  const [form, setForm] = useState({
+    full_name: '', username: '', date_of_birth: '', class_id: '',
+    password: '', parent_name: '', parent_phone: '',
+    parent_email: '', dismissal_method: 'pickup',
+  });
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/admin/classes').then(r => r.json()).then(d => {
+      if (d.classes) {
+        setClasses(d.classes);
+        // Pre-select teacher's class
+        if (teacher?.class_id) setForm(f => ({ ...f, class_id: teacher.class_id }));
+      }
+    });
+  }, [teacher]);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    const res = await fetch('/api/admin/students', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setMsg(`Student added! ID: ${data.unique_id}`);
+      setForm({
+        full_name: '', username: '', date_of_birth: '', class_id: teacher?.class_id || '',
+        password: '', parent_name: '', parent_phone: '',
+        parent_email: '', dismissal_method: 'pickup',
+      });
+    } else { setMsg(data.error); }
+    setLoading(false);
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '9px 12px', border: '1.5px solid #E5E7EB',
+    borderRadius: 7, fontSize: 13, boxSizing: 'border-box', outline: 'none', color: '#111827',
+  };
+
+  return (
+    <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', maxWidth: 560 }}>
+      <h3 style={{ fontSize: 15, fontWeight: 600, color: '#111827', marginBottom: 20 }}>Add New Student</h3>
+      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {[
+          { label: 'Full Name', key: 'full_name', type: 'text', placeholder: 'Student full name' },
+          { label: 'Username', key: 'username', type: 'text', placeholder: 'e.g. john.doe' },
+          { label: 'Date of Birth', key: 'date_of_birth', type: 'date', placeholder: '' },
+          { label: 'Parent/Guardian Name', key: 'parent_name', type: 'text', placeholder: 'Parent full name' },
+          { label: 'Parent Phone', key: 'parent_phone', type: 'text', placeholder: '+234...' },
+          { label: 'Parent Email (optional)', key: 'parent_email', type: 'email', placeholder: 'parent@email.com' },
+        ].map(f => (
+          <div key={f.key}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>{f.label}</label>
+            <input type={f.type} placeholder={f.placeholder} value={(form as any)[f.key]}
+              onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+              required={f.key !== 'parent_email'}
+              style={inputStyle} />
+          </div>
+        ))}
+
+        {/* Password with toggle */}
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Password</label>
+          <div style={{ position: 'relative' }}>
+            <input required type={showPassword ? 'text' : 'password'} placeholder="Set a password"
+              value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+              style={{ ...inputStyle, paddingRight: 44 }} />
+            <button type="button" onClick={() => setShowPassword(s => !s)}
+              style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#6B7280' }}>
+              {showPassword ? 'Hide' : 'Show'}
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Class</label>
+          <select value={form.class_id} onChange={e => setForm(p => ({ ...p, class_id: e.target.value }))} style={inputStyle}>
+            <option value="">Select class</option>
+            {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Dismissal</label>
+          <select value={form.dismissal_method} onChange={e => setForm(p => ({ ...p, dismissal_method: e.target.value }))} style={inputStyle}>
+            <option value="pickup">Picked up by parent</option>
+            <option value="alone">Goes home alone</option>
+          </select>
+        </div>
+
+        {msg && <p style={{ fontSize: 12, color: msg.includes('ID:') ? '#059669' : '#DC2626' }}>{msg}</p>}
+        <button type="submit" disabled={loading} style={{ background: '#059669', color: 'white', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+          {loading ? 'Adding...' : 'Add Student'}
         </button>
       </form>
     </div>
