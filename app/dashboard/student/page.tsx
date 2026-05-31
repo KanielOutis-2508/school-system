@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-const TABS = ['Overview', 'Results', 'Behaviour', 'Assignments', 'Attendance', 'Fees'];
+const TABS = ['Overview', 'Results', 'Behaviour', 'Assignments', 'Attendance', 'Fees', 'Timetable'];
 
 export default function StudentDashboard() {
   const router = useRouter();
@@ -62,6 +62,7 @@ export default function StudentDashboard() {
         {activeTab === 'Assignments' && <StudentAssignments />}
         {activeTab === 'Attendance' && <StudentAttendance />}
         {activeTab === 'Fees' && <StudentFees />}
+        {activeTab === 'Timetable' && <StudentTimetable />}
       </div>
     </main>
   );
@@ -386,6 +387,52 @@ function StudentFees() {
               </div>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StudentTimetable() {
+  const [timetable, setTimetable] = useState<any[]>([]);
+  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+  useEffect(() => {
+    fetch('/api/student/timetable')
+      .then(r => r.json())
+      .then(d => { if (d.timetable) setTimetable(d.timetable); });
+  }, []);
+
+  const groupByDay = (entries: any[]) => {
+    return DAYS.reduce((acc, day) => {
+      acc[day] = entries.filter(e => e.day === day).sort((a, b) => a.period - b.period);
+      return acc;
+    }, {} as Record<string, any[]>);
+  };
+
+  const grouped = groupByDay(timetable);
+
+  return (
+    <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+      <h3 style={{ fontSize: 15, fontWeight: 600, color: '#111827', marginBottom: 20 }}>My Class Timetable</h3>
+      {timetable.length === 0 ? (
+        <p style={{ fontSize: 13, color: '#9CA3AF' }}>No timetable set for your class yet.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {DAYS.map(day => grouped[day]?.length > 0 ? (
+            <div key={day}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#7C3AED', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>{day}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
+                {grouped[day].map(p => (
+                  <div key={p.id} style={{ padding: '12px 14px', background: '#F9FAFB', borderRadius: 8, borderLeft: '3px solid #7C3AED' }}>
+                    <div style={{ fontSize: 10, color: '#9CA3AF', marginBottom: 4 }}>Period {p.period} · {p.start_time} – {p.end_time}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>{p.subject}</div>
+                    {p.teacher_name && <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>{p.teacher_name}</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null)}
         </div>
       )}
     </div>

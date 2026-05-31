@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 
-const TABS = ['Overview', 'Students', 'Add Student', 'Results', 'Behaviour', 'Assignments', 'Attendance'];
+const TABS = ['Overview', 'Students', 'Add Student', 'Results', 'Behaviour', 'Assignments', 'Attendance', 'Timetable'];
 
 export default function TeacherDashboard() {
   const router = useRouter();
@@ -65,6 +65,7 @@ export default function TeacherDashboard() {
         {activeTab === 'Assignments' && <ManageAssignments teacher={teacher} />}
         {activeTab === 'Attendance' && <TakeAttendance teacher={teacher} />}
         {activeTab === 'Add Student' && <AddStudentTab teacher={teacher} />}
+        {activeTab === 'Timetable' && <TimetableTab teacher={teacher} />}
       </div>
     </main>
   );
@@ -603,6 +604,250 @@ function AddStudentTab({ teacher }: { teacher: any }) {
           {loading ? 'Adding...' : 'Add Student'}
         </button>
       </form>
+    </div>
+  );
+}
+function TimetableTab({ teacher }: { teacher: any }) {
+  const [classTimetable, setClassTimetable] = useState<any[]>([]);
+  const [teacherTimetable, setTeacherTimetable] = useState<any[]>([]);
+  const [activeSection, setActiveSection] = useState<'class' | 'personal'>('class');
+  const [classForm, setClassForm] = useState({ day: 'Monday', period: '1', subject: '', teacher_name: '', start_time: '', end_time: '' });
+  const [personalForm, setPersonalForm] = useState({ day: 'Monday', class_name: '', subject: '', start_time: '', end_time: '' });
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+  useEffect(() => {
+    if (!teacher) return;
+    fetch('/api/teacher/timetable')
+      .then(r => r.json())
+      .then(d => {
+        if (d.classTimetable) setClassTimetable(d.classTimetable);
+        if (d.teacherTimetable) setTeacherTimetable(d.teacherTimetable);
+      });
+  }, [teacher]);
+
+  const submitClass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    const res = await fetch('/api/teacher/timetable', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'class', ...classForm, period: Number(classForm.period) }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setMsg('Class timetable updated!');
+      setClassTimetable(prev => {
+        const exists = prev.findIndex(t => t.day === classForm.day && t.period === Number(classForm.period));
+        if (exists >= 0) { const updated = [...prev]; updated[exists] = data.entry; return updated; }
+        return [...prev, data.entry];
+      });
+      setClassForm({ day: 'Monday', period: '1', subject: '', teacher_name: '', start_time: '', end_time: '' });
+    } else { setMsg(data.error); }
+    setLoading(false);
+  };
+
+  const submitPersonal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    const res = await fetch('/api/teacher/timetable', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'personal', ...personalForm }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setMsg('Personal timetable updated!');
+      setTeacherTimetable(prev => [...prev, data.entry]);
+      setPersonalForm({ day: 'Monday', class_name: '', subject: '', start_time: '', end_time: '' });
+    } else { setMsg(data.error); }
+    setLoading(false);
+  };
+
+  const deleteEntry = async (id: string, type: string) => {
+    const res = await fetch('/api/teacher/timetable', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, type }),
+    });
+    if (res.ok) {
+      if (type === 'class') setClassTimetable(prev => prev.filter(t => t.id !== id));
+      else setTeacherTimetable(prev => prev.filter(t => t.id !== id));
+    }
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '9px 12px', border: '1.5px solid #E5E7EB',
+    borderRadius: 7, fontSize: 13, boxSizing: 'border-box', outline: 'none', color: '#111827',
+  };
+
+  const groupByDay = (entries: any[]) => {
+    return DAYS.reduce((acc, day) => {
+      acc[day] = entries.filter(e => e.day === day).sort((a, b) => (a.period || a.start_time) - (b.period || b.start_time));
+      return acc;
+    }, {} as Record<string, any[]>);
+  };
+
+  return (
+    <div>
+      {/* Section toggle */}
+      <div style={{ display: 'flex', gap: 4, background: 'white', borderRadius: 10, padding: 4, marginBottom: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', width: 'fit-content' }}>
+        {[{ key: 'class', label: 'Class Timetable' }, { key: 'personal', label: 'My Schedule' }].map(s => (
+          <button key={s.key} onClick={() => { setActiveSection(s.key as any); setMsg(''); }} style={{
+            padding: '8px 20px', borderRadius: 7, border: 'none', cursor: 'pointer',
+            fontSize: 13, fontWeight: 500,
+            background: activeSection === s.key ? '#059669' : 'transparent',
+            color: activeSection === s.key ? 'white' : '#6B7280',
+          }}>{s.label}</button>
+        ))}
+      </div>
+
+      {activeSection === 'class' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 24 }}>
+          {/* Add class period */}
+          <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: '#111827', marginBottom: 20 }}>Add Class Period</h3>
+            <form onSubmit={submitClass} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Day</label>
+                <select value={classForm.day} onChange={e => setClassForm(p => ({ ...p, day: e.target.value }))} style={inputStyle}>
+                  {DAYS.map(d => <option key={d}>{d}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Period</label>
+                <select value={classForm.period} onChange={e => setClassForm(p => ({ ...p, period: e.target.value }))} style={inputStyle}>
+                  {[1,2,3,4,5,6,7,8].map(n => <option key={n} value={n}>Period {n}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Subject</label>
+                <input required type="text" value={classForm.subject} onChange={e => setClassForm(p => ({ ...p, subject: e.target.value }))} placeholder="e.g. Mathematics" style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Teacher Name</label>
+                <input type="text" value={classForm.teacher_name} onChange={e => setClassForm(p => ({ ...p, teacher_name: e.target.value }))} placeholder="e.g. Mr. Smith" style={inputStyle} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Start Time</label>
+                  <input required type="time" value={classForm.start_time} onChange={e => setClassForm(p => ({ ...p, start_time: e.target.value }))} style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>End Time</label>
+                  <input required type="time" value={classForm.end_time} onChange={e => setClassForm(p => ({ ...p, end_time: e.target.value }))} style={inputStyle} />
+                </div>
+              </div>
+              {msg && <p style={{ fontSize: 12, color: msg.includes('updated') ? '#059669' : '#DC2626' }}>{msg}</p>}
+              <button type="submit" disabled={loading} style={{ background: '#059669', color: 'white', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                {loading ? 'Saving...' : 'Save Period'}
+              </button>
+            </form>
+          </div>
+
+          {/* Class timetable view */}
+          <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: '#111827', marginBottom: 20 }}>Class Timetable</h3>
+            {classTimetable.length === 0 ? (
+              <p style={{ fontSize: 13, color: '#9CA3AF' }}>No periods added yet.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {Object.entries(groupByDay(classTimetable)).map(([day, periods]) => periods.length === 0 ? null : (
+                  <div key={day}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>{day}</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {periods.map(p => (
+                        <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: '#F9FAFB', borderRadius: 8 }}>
+                          <div>
+                            <span style={{ fontSize: 11, color: '#9CA3AF', marginRight: 8 }}>P{p.period}</span>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{p.subject}</span>
+                            {p.teacher_name && <span style={{ fontSize: 11, color: '#6B7280', marginLeft: 8 }}>· {p.teacher_name}</span>}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 11, color: '#6B7280' }}>{p.start_time} – {p.end_time}</span>
+                            <button onClick={() => deleteEntry(p.id, 'class')} style={{ fontSize: 11, background: '#FEF2F2', color: '#DC2626', border: 'none', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}>✕</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeSection === 'personal' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 24 }}>
+          {/* Add personal entry */}
+          <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: '#111827', marginBottom: 20 }}>Add to My Schedule</h3>
+            <form onSubmit={submitPersonal} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Day</label>
+                <select value={personalForm.day} onChange={e => setPersonalForm(p => ({ ...p, day: e.target.value }))} style={inputStyle}>
+                  {DAYS.map(d => <option key={d}>{d}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Class</label>
+                <input required type="text" value={personalForm.class_name} onChange={e => setPersonalForm(p => ({ ...p, class_name: e.target.value }))} placeholder="e.g. JSS 1A" style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Subject</label>
+                <input required type="text" value={personalForm.subject} onChange={e => setPersonalForm(p => ({ ...p, subject: e.target.value }))} placeholder="e.g. Mathematics" style={inputStyle} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Start Time</label>
+                  <input required type="time" value={personalForm.start_time} onChange={e => setPersonalForm(p => ({ ...p, start_time: e.target.value }))} style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>End Time</label>
+                  <input required type="time" value={personalForm.end_time} onChange={e => setPersonalForm(p => ({ ...p, end_time: e.target.value }))} style={inputStyle} />
+                </div>
+              </div>
+              {msg && <p style={{ fontSize: 12, color: msg.includes('updated') ? '#059669' : '#DC2626' }}>{msg}</p>}
+              <button type="submit" disabled={loading} style={{ background: '#059669', color: 'white', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                {loading ? 'Saving...' : 'Add to Schedule'}
+              </button>
+            </form>
+          </div>
+
+          {/* Personal timetable view */}
+          <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: '#111827', marginBottom: 20 }}>My Schedule</h3>
+            {teacherTimetable.length === 0 ? (
+              <p style={{ fontSize: 13, color: '#9CA3AF' }}>No schedule added yet.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {Object.entries(groupByDay(teacherTimetable)).map(([day, entries]) => entries.length === 0 ? null : (
+                  <div key={day}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>{day}</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {entries.map(e => (
+                        <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: '#F9FAFB', borderRadius: 8 }}>
+                          <div>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{e.subject}</span>
+                            <span style={{ fontSize: 11, color: '#6B7280', marginLeft: 8 }}>· {e.class_name}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 11, color: '#6B7280' }}>{e.start_time} – {e.end_time}</span>
+                            <button onClick={() => deleteEntry(e.id, 'personal')} style={{ fontSize: 11, background: '#FEF2F2', color: '#DC2626', border: 'none', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}>✕</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
