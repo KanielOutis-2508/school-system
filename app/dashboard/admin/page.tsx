@@ -179,7 +179,7 @@ const [form, setForm] = useState({ full_name: '', username: '', email: '', class
 function StudentsTab() {
   const [students, setStudents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
-  const [form, setForm] = useState({ full_name: '', date_of_birth: '', class_id: '', password: '', parent_name: '', parent_phone: '', parent_email: '', dismissal_method: 'pickup' });
+  const [form, setForm] = useState({ full_name: '', username: '', date_of_birth: '', class_id: '', password: '', parent_name: '', parent_phone: '', parent_email: '', dismissal_method: 'pickup' });
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -197,7 +197,7 @@ function StudentsTab() {
     if (res.ok) {
       setMsg(`Student added! ID: ${data.unique_id}`);
       setStudents(s => [...s, data.student]);
-      setForm({ full_name: '', date_of_birth: '', class_id: '', password: '', parent_name: '', parent_phone: '', parent_email: '', dismissal_method: 'pickup' });
+      setForm({ full_name: '', username: '', date_of_birth: '', class_id: '', password: '', parent_name: '', parent_phone: '', parent_email: '', dismissal_method: 'pickup' });
     } else { setMsg(data.error); }
     setLoading(false);
   };
@@ -211,6 +211,7 @@ function StudentsTab() {
         <form onSubmit={addStudent} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {[
             { label: 'Full Name', key: 'full_name', type: 'text', placeholder: 'Student full name' },
+            { label: 'Username', key: 'username', type: 'text', placeholder: 'e.g. john.doe' },
             { label: 'Date of Birth', key: 'date_of_birth', type: 'date', placeholder: '' },
             { label: 'Parent/Guardian Name', key: 'parent_name', type: 'text', placeholder: 'Parent full name' },
             { label: 'Parent Phone', key: 'parent_phone', type: 'text', placeholder: '+234...' },
@@ -258,17 +259,33 @@ function StudentsTab() {
       </div>
       <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
         <h3 style={{ fontSize: 15, fontWeight: 600, color: '#111827', marginBottom: 20 }}>All Students ({students.length})</h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+         {students.map(s => (
+          <div key={s.id} style={{ padding: '12px 14px', background: '#F9FAFB', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{s.full_name}</div>
+          <div style={{ fontSize: 11, color: '#6B7280' }}>{s.unique_id} {s.username ? `· @${s.username}` : ''}</div>
+          </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+             <span style={{ fontSize: 11, background: '#ECFDF5', color: '#059669', padding: '3px 8px', borderRadius: 4 }}>Student</span>
+             <button
+            onClick={async () => {
+        if (!confirm(`Remove ${s.full_name}?`)) return;
+          const res = await fetch('/api/admin/students', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: s.id }),
+          });
+          if (res.ok) setStudents(prev => prev.filter(x => x.id !== s.id));
+        }}
+        style={{ fontSize: 11, background: '#FEF2F2', color: '#DC2626', border: 'none', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}>
+        Remove
+      </button>
+    </div>
+  </div>
+))}    
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {students.length === 0 && <p style={{ fontSize: 13, color: '#9CA3AF' }}>No students yet.</p>}
-          {students.map(s => (
-            <div key={s.id} style={{ padding: '12px 14px', background: '#F9FAFB', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{s.full_name}</div>
-                <div style={{ fontSize: 11, color: '#6B7280' }}>{s.unique_id}</div>
-              </div>
-              <span style={{ fontSize: 11, background: '#ECFDF5', color: '#059669', padding: '3px 8px', borderRadius: 4 }}>Student</span>
-            </div>
-          ))}
+          
         </div>
       </div>
     </div>

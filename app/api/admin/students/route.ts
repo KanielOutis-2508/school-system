@@ -25,19 +25,28 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const {
-      full_name, password, class_id,
+      full_name, password, class_id, username,
       date_of_birth, parent_name, parent_phone,
       parent_email, dismissal_method,
     } = await request.json();
 
-    if (!full_name || !password || !parent_phone) {
-      return NextResponse.json({ error: 'Name, password and parent phone required' }, { status: 400 });
+    if (!full_name || !password || !parent_phone || !username) {
+      return NextResponse.json({ error: 'Name, username, password and parent phone required' }, { status: 400 });
     }
 
-    // Hash password
+    // Check username not taken
+    const { data: existing } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username.toLowerCase())
+      .single();
+
+    if (existing) {
+      return NextResponse.json({ error: 'Username already taken' }, { status: 400 });
+    }
+
     const password_hash = await bcrypt.hash(password, 10);
 
-    // Generate unique ID
     let unique_id = generateStudentId();
     let exists = true;
     while (exists) {
@@ -50,7 +59,6 @@ export async function POST(request: NextRequest) {
       else unique_id = generateStudentId();
     }
 
-    // Create user
     const { data: student, error: userError } = await supabase
       .from('users')
       .insert({
@@ -58,6 +66,7 @@ export async function POST(request: NextRequest) {
         password_hash,
         role: 'student',
         unique_id,
+        username: username.toLowerCase(),
         class_id: class_id || null,
       })
       .select()
@@ -65,7 +74,6 @@ export async function POST(request: NextRequest) {
 
     if (userError) throw userError;
 
-    // Create student profile
     await supabase.from('student_profiles').insert({
       user_id: student.id,
       date_of_birth: date_of_birth || null,
@@ -76,6 +84,26 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ student, unique_id });
+  } catch {
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  }
+}
+export async function DELETE(request: NextRequest) {
+  try {
+    const { id } = await request.json();
+
+    if (!id) {
+      return NextResponse.json({ error: 'Student ID required' }, { status: 400 });
+    }
+
+    const { error } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', id)
+      .eq('role', 'student');
+
+    if (error) throw error;
+    return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
