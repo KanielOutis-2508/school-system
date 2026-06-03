@@ -1,25 +1,25 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
-import Avatar from '@/components/Avatar';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Avatar from '@/components/Avatar';
 
 const TABS = ['Overview', 'Teachers', 'Students', 'Classes', 'Fees'];
 
 export default function AdminDashboard() {
-  const [adminUser, setAdminUser] = useState<any>(null);
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('Overview');
   const [stats, setStats] = useState({ teachers: 0, students: 0, classes: 0 });
+  const [adminUser, setAdminUser] = useState<any>(null);
 
   useEffect(() => {
     fetch('/api/admin/stats')
       .then(r => r.json())
       .then(d => { if (d.stats) setStats(d.stats); })
       .catch(() => {});
-      fetch('/api/teacher/me')
-  .then(r => r.json())
-  .then(d => { if (d.teacher) setAdminUser(d.teacher); });
+    fetch('/api/teacher/me')
+      .then(r => r.json())
+      .then(d => { if (d.teacher) setAdminUser(d.teacher); });
   }, []);
 
   const logout = async () => {
@@ -32,13 +32,13 @@ export default function AdminDashboard() {
       <nav style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Avatar
-          userId={adminUser?.id || 'admin'}
-          avatarUrl={adminUser?.avatar_url || null}
-          name={adminUser?.full_name || 'Admin'}
-          color="#1a56db"
-          size={36}
-          onUpdate={url => setAdminUser((u: any) => ({ ...u, avatar_url: url }))}
-        />
+            userId={adminUser?.id || 'admin'}
+            avatarUrl={adminUser?.avatar_url || null}
+            name={adminUser?.full_name || 'Admin'}
+            color="#1a56db"
+            size={36}
+            onUpdate={url => setAdminUser((u: any) => ({ ...u, avatar_url: url }))}
+          />
           <div>
             <div style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>Nazareth School</div>
             <div style={{ fontSize: 11, color: '#6B7280' }}>Admin Dashboard</div>
@@ -100,7 +100,7 @@ export default function AdminDashboard() {
 function TeachersTab() {
   const [teachers, setTeachers] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
-const [form, setForm] = useState({ full_name: '', username: '', email: '', class_id: '', password: '' });
+  const [form, setForm] = useState({ full_name: '', username: '', email: '', class_id: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -133,11 +133,11 @@ const [form, setForm] = useState({ full_name: '', username: '', email: '', class
           {[
             { label: 'Full Name', key: 'full_name', type: 'text', placeholder: 'e.g. Mrs. Johnson' },
             { label: 'Username', key: 'username', type: 'text', placeholder: 'e.g. mrs.johnson' },
-          { label: 'Email', key: 'email', type: 'email', placeholder: 'teacher@school.com' },
+            { label: 'Email', key: 'email', type: 'email', placeholder: 'teacher@school.com' },
           ].map(f => (
             <div key={f.key}>
               <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>{f.label}</label>
-              <input required type={f.type} placeholder={f.placeholder} value={(form as any)[f.key]}
+              <input required={f.key !== 'email'} type={f.type} placeholder={f.placeholder} value={(form as any)[f.key]}
                 onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
                 style={inputStyle} />
             </div>
@@ -155,9 +155,9 @@ const [form, setForm] = useState({ full_name: '', username: '', email: '', class
             </div>
           </div>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Assign Class</label>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Assign Class (optional)</label>
             <select value={form.class_id} onChange={e => setForm(p => ({ ...p, class_id: e.target.value }))} style={inputStyle}>
-              <option value="">Select class</option>
+              <option value="">No class (subject teacher)</option>
               {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
@@ -172,29 +172,29 @@ const [form, setForm] = useState({ full_name: '', username: '', email: '', class
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {teachers.length === 0 && <p style={{ fontSize: 13, color: '#9CA3AF' }}>No teachers yet.</p>}
           {teachers.map(t => (
-  <div key={t.id} style={{ padding: '12px 14px', background: '#F9FAFB', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-    <div>
-      <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{t.full_name}</div>
-      <div style={{ fontSize: 11, color: '#6B7280' }}>{t.unique_id} {t.username ? `· @${t.username}` : ''}</div>
-    </div>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <span style={{ fontSize: 11, background: '#EFF6FF', color: '#1a56db', padding: '3px 8px', borderRadius: 4 }}>Teacher</span>
-      <button
-        onClick={async () => {
-          if (!confirm(`Remove ${t.full_name}?`)) return;
-          const res = await fetch('/api/admin/teachers', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: t.id }),
-          });
-          if (res.ok) setTeachers(prev => prev.filter(x => x.id !== t.id));
-        }}
-        style={{ fontSize: 11, background: '#FEF2F2', color: '#DC2626', border: 'none', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}>
-        Remove
-      </button>
-    </div>
-  </div>
-))}
+            <div key={t.id} style={{ padding: '12px 14px', background: '#F9FAFB', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{t.full_name}</div>
+                <div style={{ fontSize: 11, color: '#6B7280' }}>{t.unique_id} {t.username ? `· @${t.username}` : ''}</div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 11, background: '#EFF6FF', color: '#1a56db', padding: '3px 8px', borderRadius: 4 }}>Teacher</span>
+                <button
+                  onClick={async () => {
+                    if (!confirm(`Remove ${t.full_name}?`)) return;
+                    const res = await fetch('/api/admin/teachers', {
+                      method: 'DELETE',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ id: t.id }),
+                    });
+                    if (res.ok) setTeachers(prev => prev.filter(x => x.id !== t.id));
+                  }}
+                  style={{ fontSize: 11, background: '#FEF2F2', color: '#DC2626', border: 'none', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}>
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -204,7 +204,10 @@ const [form, setForm] = useState({ full_name: '', username: '', email: '', class
 function StudentsTab() {
   const [students, setStudents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
-  const [form, setForm] = useState({ full_name: '', username: '', date_of_birth: '', class_id: '', password: '', parent_name: '', parent_phone: '', parent_email: '', dismissal_method: 'pickup' });
+  const [form, setForm] = useState({
+    full_name: '', username: '', date_of_birth: '', class_id: '', password: '',
+    parent_name: '', parent_phone: '', parent_email: '', dismissal_method: 'pickup', school_level: 'junior'
+  });
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -222,7 +225,7 @@ function StudentsTab() {
     if (res.ok) {
       setMsg(`Student added! ID: ${data.unique_id}`);
       setStudents(s => [...s, data.student]);
-      setForm({ full_name: '', username: '', date_of_birth: '', class_id: '', password: '', parent_name: '', parent_phone: '', parent_email: '', dismissal_method: 'pickup' });
+      setForm({ full_name: '', username: '', date_of_birth: '', class_id: '', password: '', parent_name: '', parent_phone: '', parent_email: '', dismissal_method: 'pickup', school_level: 'junior' });
     } else { setMsg(data.error); }
     setLoading(false);
   };
@@ -263,6 +266,13 @@ function StudentsTab() {
             </div>
           </div>
           <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>School Level</label>
+            <select value={form.school_level} onChange={e => setForm(p => ({ ...p, school_level: e.target.value }))} style={inputStyle}>
+              <option value="junior">Junior Secondary (JSS)</option>
+              <option value="senior">Senior Secondary (SSS)</option>
+            </select>
+          </div>
+          <div>
             <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Class</label>
             <select value={form.class_id} onChange={e => setForm(p => ({ ...p, class_id: e.target.value }))} style={inputStyle}>
               <option value="">Select class</option>
@@ -284,33 +294,34 @@ function StudentsTab() {
       </div>
       <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
         <h3 style={{ fontSize: 15, fontWeight: 600, color: '#111827', marginBottom: 20 }}>All Students ({students.length})</h3>
-         {students.map(s => (
-          <div key={s.id} style={{ padding: '12px 14px', background: '#F9FAFB', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{s.full_name}</div>
-          <div style={{ fontSize: 11, color: '#6B7280' }}>{s.unique_id} {s.username ? `· @${s.username}` : ''}</div>
-          </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-             <span style={{ fontSize: 11, background: '#ECFDF5', color: '#059669', padding: '3px 8px', borderRadius: 4 }}>Student</span>
-             <button
-            onClick={async () => {
-        if (!confirm(`Remove ${s.full_name}?`)) return;
-          const res = await fetch('/api/admin/students', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: s.id }),
-          });
-          if (res.ok) setStudents(prev => prev.filter(x => x.id !== s.id));
-        }}
-        style={{ fontSize: 11, background: '#FEF2F2', color: '#DC2626', border: 'none', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}>
-        Remove
-      </button>
-    </div>
-  </div>
-))}    
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {students.length === 0 && <p style={{ fontSize: 13, color: '#9CA3AF' }}>No students yet.</p>}
-          
+          {students.map(s => (
+            <div key={s.id} style={{ padding: '12px 14px', background: '#F9FAFB', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{s.full_name}</div>
+                <div style={{ fontSize: 11, color: '#6B7280' }}>{s.unique_id} {s.username ? `· @${s.username}` : ''}</div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 11, background: '#ECFDF5', color: '#059669', padding: '3px 8px', borderRadius: 4 }}>
+                  {s.school_level === 'senior' ? 'SSS' : 'JSS'}
+                </span>
+                <button
+                  onClick={async () => {
+                    if (!confirm(`Remove ${s.full_name}?`)) return;
+                    const res = await fetch('/api/admin/students', {
+                      method: 'DELETE',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ id: s.id }),
+                    });
+                    if (res.ok) setStudents(prev => prev.filter(x => x.id !== s.id));
+                  }}
+                  style={{ fontSize: 11, background: '#FEF2F2', color: '#DC2626', border: 'none', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}>
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

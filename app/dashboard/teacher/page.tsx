@@ -4,7 +4,7 @@ import Avatar from '@/components/Avatar';
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 
-const TABS = ['Overview', 'Students', 'Add Student', 'Results', 'Behaviour', 'Assignments', 'Attendance', 'Timetable'];
+const TABS = ['Overview', 'Students', 'Add Student', 'Results', 'Behaviour', 'Assignments', 'Attendance', 'Timetable', 'Ranking'];
 
 export default function TeacherDashboard() {
   const router = useRouter();
@@ -72,6 +72,7 @@ export default function TeacherDashboard() {
         {activeTab === 'Attendance' && <TakeAttendance teacher={teacher} />}
         {activeTab === 'Add Student' && <AddStudentTab teacher={teacher} />}
         {activeTab === 'Timetable' && <TimetableTab teacher={teacher} />}
+        {activeTab === 'Ranking' && <ClassRanking teacher={teacher} />}
       </div>
     </main>
   );
@@ -160,7 +161,7 @@ function EnterResults({ teacher }: { teacher: any }) {
   const [students, setStudents] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [form, setForm] = useState({
-    student_id: '', subject_id: '', term: 'first',
+    student_id: '', subject_id: '', term: 'first', school_level: 'junior',
     exam_score: '', test_score: '', midterm_score: '',
     classwork_score: '', assignment_score: '', note_score: '',
   });
@@ -173,17 +174,12 @@ function EnterResults({ teacher }: { teacher: any }) {
     fetch('/api/teacher/subjects').then(r => r.json()).then(d => { if (d.subjects) setSubjects(d.subjects); });
   }, [teacher]);
 
-  // Auto calculate total
- const total = useMemo(() => {
-  return (
-    Number(form.exam_score || 0) +
-    Number(form.test_score || 0) +
-    Number(form.midterm_score || 0) +
-    Number(form.classwork_score || 0) +
-    Number(form.assignment_score || 0) +
-    Number(form.note_score || 0)
-  );
-}, [form]);
+  const isSenior = form.school_level === 'senior';
+
+  const total = isSenior
+    ? Number(form.exam_score || 0) + Number(form.test_score || 0) + Number(form.midterm_score || 0) + Number(form.note_score || 0)
+    : Number(form.exam_score || 0) + Number(form.test_score || 0) + Number(form.midterm_score || 0) + Number(form.classwork_score || 0) + Number(form.assignment_score || 0) + Number(form.note_score || 0);
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -207,7 +203,7 @@ function EnterResults({ teacher }: { teacher: any }) {
     fontSize: 13, outline: 'none', boxSizing: 'border-box', color: '#111827',
   };
 
-  const scoreFields = [
+  const juniorFields = [
     { label: 'Exam Score', key: 'exam_score', max: 40 },
     { label: 'Test Score', key: 'test_score', max: 20 },
     { label: 'Mid Term Project', key: 'midterm_score', max: 10 },
@@ -216,10 +212,38 @@ function EnterResults({ teacher }: { teacher: any }) {
     { label: 'Note Score', key: 'note_score', max: 10 },
   ];
 
+  const seniorFields = [
+    { label: 'Exam Score', key: 'exam_score', max: 60 },
+    { label: 'Test Score', key: 'test_score', max: 20 },
+    { label: 'Mid Term Project', key: 'midterm_score', max: 10 },
+    { label: 'Note Score', key: 'note_score', max: 10 },
+  ];
+
+  const scoreFields = isSenior ? seniorFields : juniorFields;
+
   return (
     <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', maxWidth: 560 }}>
       <h3 style={{ fontSize: 15, fontWeight: 600, color: '#111827', marginBottom: 20 }}>Enter Student Result</h3>
       <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        {/* School Level Toggle */}
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>School Level</label>
+          <div style={{ display: 'flex', gap: 4, background: '#F3F4F6', borderRadius: 8, padding: 4 }}>
+            {[{ value: 'junior', label: 'Junior (JSS)' }, { value: 'senior', label: 'Senior (SSS)' }].map(l => (
+              <button key={l.value} type="button"
+                onClick={() => setForm(p => ({ ...p, school_level: l.value, exam_score: '', test_score: '', midterm_score: '', classwork_score: '', assignment_score: '', note_score: '' }))}
+                style={{
+                  flex: 1, padding: '8px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                  fontSize: 12, fontWeight: 600,
+                  background: form.school_level === l.value ? '#059669' : 'transparent',
+                  color: form.school_level === l.value ? 'white' : '#6B7280',
+                }}>
+                {l.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Student */}
         <div>
@@ -288,7 +312,6 @@ function EnterResults({ teacher }: { teacher: any }) {
     </div>
   );
 }
-
 function EnterBehaviour({ teacher }: { teacher: any }) {
   const [students, setStudents] = useState<any[]>([]);
   const [form, setForm] = useState({ student_id: '', term: 'first', rating: 'Good', comment: '' });
@@ -852,6 +875,79 @@ function TimetableTab({ teacher }: { teacher: any }) {
               </div>
             )}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}function ClassRanking({ teacher }: { teacher: any }) {
+  const [ranking, setRanking] = useState<any[]>([]);
+  const [term, setTerm] = useState('first');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+  if (!teacher) return;
+  const fetchRanking = async () => {
+    setLoading(true);
+    const res = await fetch(`/api/teacher/ranking?term=${term}`);
+    const d = await res.json();
+    if (d.ranking) setRanking(d.ranking);
+    setLoading(false);
+  };
+  fetchRanking();
+}, [teacher, term]);
+  const positionColor = (pos: number) => {
+    if (pos === 1) return { color: '#D97706', bg: '#FFFBEB' };
+    if (pos === 2) return { color: '#6B7280', bg: '#F9FAFB' };
+    if (pos === 3) return { color: '#B45309', bg: '#FEF3C7' };
+    return { color: '#374151', bg: '#F9FAFB' };
+  };
+
+  const positionLabel = (pos: number) => {
+    if (pos === 1) return '🥇 1st';
+    if (pos === 2) return '🥈 2nd';
+    if (pos === 3) return '🥉 3rd';
+    return `${pos}th`;
+  };
+
+  return (
+    <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>Class Ranking</h3>
+        <select value={term} onChange={e => setTerm(e.target.value)}
+          style={{ padding: '6px 12px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13, color: '#111827', outline: 'none' }}>
+          <option value="first">First Term</option>
+          <option value="second">Second Term</option>
+          <option value="third">Third Term</option>
+        </select>
+      </div>
+
+      {loading ? (
+        <p style={{ fontSize: 13, color: '#9CA3AF' }}>Loading...</p>
+      ) : ranking.length === 0 ? (
+        <p style={{ fontSize: 13, color: '#9CA3AF' }}>No results recorded for this term yet.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {ranking.map(s => {
+            const { color, bg } = positionColor(s.position);
+            return (
+              <div key={s.id} style={{
+                display: 'grid', gridTemplateColumns: '60px 1fr auto',
+                alignItems: 'center', gap: 16,
+                padding: '12px 16px', background: bg, borderRadius: 8,
+                border: s.position <= 3 ? `1px solid ${color}22` : 'none',
+              }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color }}>{positionLabel(s.position)}</div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{s.full_name}</div>
+                  <div style={{ fontSize: 11, color: '#6B7280' }}>{s.unique_id} · {s.subject_count} subjects</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#111827' }}>{s.total_score}</div>
+                  <div style={{ fontSize: 11, color: '#6B7280' }}>avg: {s.average}%</div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

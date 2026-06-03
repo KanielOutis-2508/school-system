@@ -18,12 +18,26 @@ export async function GET() {
       .eq('id', payload.id)
       .single();
 
-    const [students, assignments] = await Promise.all([
-      supabase.from('users').select('id', { count: 'exact' }).eq('class_id', teacher?.class_id).eq('role', 'student'),
-      supabase.from('assignments').select('id', { count: 'exact' }),
-    ]);
+    let studentCount = 0;
+    if (teacher?.class_id) {
+      const { count } = await supabase
+        .from('users')
+        .select('id', { count: 'exact' })
+        .eq('class_id', teacher.class_id)
+        .eq('role', 'student');
+      studentCount = count ?? 0;
+    }
 
-    return NextResponse.json({ stats: { students: students.count ?? 0, assignments: assignments.count ?? 0 } });
+    const { count: assignmentCount } = await supabase
+      .from('assignments')
+      .select('id', { count: 'exact' });
+
+    return NextResponse.json({
+      stats: {
+        students: studentCount,
+        assignments: assignmentCount ?? 0,
+      }
+    });
   } catch {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }

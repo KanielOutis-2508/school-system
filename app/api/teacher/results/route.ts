@@ -3,12 +3,24 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
-function getGrade(total: number) {
+function getJuniorGrade(total: number) {
   if (total >= 70) return 'A';
   if (total >= 60) return 'B';
   if (total >= 50) return 'C';
   if (total >= 40) return 'D';
   return 'F';
+}
+
+function getSeniorGrade(total: number) {
+  if (total >= 75) return 'A1';
+  if (total >= 70) return 'B2';
+  if (total >= 65) return 'B3';
+  if (total >= 60) return 'C4';
+  if (total >= 55) return 'C5';
+  if (total >= 50) return 'C6';
+  if (total >= 45) return 'D7';
+  if (total >= 40) return 'E8';
+  return 'F9';
 }
 
 export async function POST(request: NextRequest) {
@@ -21,7 +33,7 @@ export async function POST(request: NextRequest) {
     if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const {
-      student_id, subject_id, term,
+      student_id, subject_id, term, school_level,
       exam_score, test_score, midterm_score,
       classwork_score, assignment_score, note_score,
     } = await request.json();
@@ -30,34 +42,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'All fields required' }, { status: 400 });
     }
 
-    // Validate max scores
-    if (Number(exam_score) > 40) return NextResponse.json({ error: 'Exam max is 40' }, { status: 400 });
-    if (Number(test_score) > 20) return NextResponse.json({ error: 'Test max is 20' }, { status: 400 });
-    if (Number(midterm_score) > 10) return NextResponse.json({ error: 'Midterm max is 10' }, { status: 400 });
-    if (Number(classwork_score) > 10) return NextResponse.json({ error: 'Classwork max is 10' }, { status: 400 });
-    if (Number(assignment_score) > 10) return NextResponse.json({ error: 'Assignment max is 10' }, { status: 400 });
-    if (Number(note_score) > 10) return NextResponse.json({ error: 'Note max is 10' }, { status: 400 });
+    const isSenior = school_level === 'senior';
+
+    // Validate max scores based on level
+    if (isSenior) {
+      if (Number(exam_score) > 60) return NextResponse.json({ error: 'Senior exam max is 60' }, { status: 400 });
+      if (Number(test_score) > 20) return NextResponse.json({ error: 'Test max is 20' }, { status: 400 });
+      if (Number(midterm_score) > 10) return NextResponse.json({ error: 'Project max is 10' }, { status: 400 });
+      if (Number(note_score) > 10) return NextResponse.json({ error: 'Note max is 10' }, { status: 400 });
+    } else {
+      if (Number(exam_score) > 40) return NextResponse.json({ error: 'Junior exam max is 40' }, { status: 400 });
+      if (Number(test_score) > 20) return NextResponse.json({ error: 'Test max is 20' }, { status: 400 });
+      if (Number(midterm_score) > 10) return NextResponse.json({ error: 'Midterm max is 10' }, { status: 400 });
+      if (Number(classwork_score) > 10) return NextResponse.json({ error: 'Classwork max is 10' }, { status: 400 });
+      if (Number(assignment_score) > 10) return NextResponse.json({ error: 'Assignment max is 10' }, { status: 400 });
+      if (Number(note_score) > 10) return NextResponse.json({ error: 'Note max is 10' }, { status: 400 });
+    }
 
     // Calculate total
-    const total = 
-      Number(exam_score || 0) +
-      Number(test_score || 0) +
-      Number(midterm_score || 0) +
-      Number(classwork_score || 0) +
-      Number(assignment_score || 0) +
-      Number(note_score || 0);
+    const total = isSenior
+      ? Number(exam_score || 0) + Number(test_score || 0) + Number(midterm_score || 0) + Number(note_score || 0)
+      : Number(exam_score || 0) + Number(test_score || 0) + Number(midterm_score || 0) + Number(classwork_score || 0) + Number(assignment_score || 0) + Number(note_score || 0);
 
-    const grade = getGrade(total);
+    const grade = isSenior ? getSeniorGrade(total) : getJuniorGrade(total);
 
     const { error } = await supabase
       .from('results')
       .upsert({
         student_id, subject_id, term,
+        school_level: school_level || 'junior',
         exam_score: Number(exam_score || 0),
         test_score: Number(test_score || 0),
         midterm_score: Number(midterm_score || 0),
-        classwork_score: Number(classwork_score || 0),
-        assignment_score: Number(assignment_score || 0),
+        classwork_score: isSenior ? 0 : Number(classwork_score || 0),
+        assignment_score: isSenior ? 0 : Number(assignment_score || 0),
         note_score: Number(note_score || 0),
         score: total,
         grade,
