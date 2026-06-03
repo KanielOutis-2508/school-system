@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
+import Avatar from '@/components/Avatar';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -26,9 +27,14 @@ export default function StudentDashboard() {
     <main style={{ minHeight: '100vh', background: '#F3F4F6', fontFamily: 'Inter, sans-serif' }}>
       <nav style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ color: 'white', fontWeight: 700, fontSize: 16 }}>N</span>
-          </div>
+          <Avatar
+          userId={student?.id || 'student'}
+          avatarUrl={student?.avatar_url || null}
+          name={student?.full_name || 'Student'}
+          color="#7C3AED"
+          size={36}
+          onUpdate={url => setStudent((s: any) => ({ ...s, avatar_url: url }))}
+        />
           <div>
             <div style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>
               {student ? student.full_name : 'Student'}

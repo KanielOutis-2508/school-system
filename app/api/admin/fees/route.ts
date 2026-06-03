@@ -8,9 +8,12 @@ export async function GET() {
       .select('*')
       .order('created_at', { ascending: false });
 
+    console.log('Fees data:', fees, 'Error:', error);
+
     if (error) throw error;
     return NextResponse.json({ fees });
-  } catch {
+  } catch (err) {
+    console.error('Fees GET error:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
@@ -18,6 +21,8 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const { student_id, term, academic_year, amount_due, amount_paid, status } = await request.json();
+
+    console.log('Creating fee:', { student_id, term, academic_year, amount_due, amount_paid, status });
 
     if (!student_id || !term || !academic_year || !amount_due) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -37,9 +42,30 @@ export async function POST(request: NextRequest) {
       .select()
       .single();
 
+    console.log('Fee created:', fee, 'Error:', error);
+
     if (error) throw error;
     return NextResponse.json({ fee });
-  } catch {
+  } catch (err) {
+    console.error('Fees POST error:', err);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { id } = await request.json();
+    if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
+
+    const { error } = await supabase
+      .from('fees')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error('Fees DELETE error:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

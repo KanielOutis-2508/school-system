@@ -1,11 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
+import Avatar from '@/components/Avatar';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 const TABS = ['Overview', 'Teachers', 'Students', 'Classes', 'Fees'];
 
 export default function AdminDashboard() {
+  const [adminUser, setAdminUser] = useState<any>(null);
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('Overview');
   const [stats, setStats] = useState({ teachers: 0, students: 0, classes: 0 });
@@ -15,6 +17,9 @@ export default function AdminDashboard() {
       .then(r => r.json())
       .then(d => { if (d.stats) setStats(d.stats); })
       .catch(() => {});
+      fetch('/api/teacher/me')
+  .then(r => r.json())
+  .then(d => { if (d.teacher) setAdminUser(d.teacher); });
   }, []);
 
   const logout = async () => {
@@ -26,9 +31,14 @@ export default function AdminDashboard() {
     <main style={{ minHeight: '100vh', background: '#F3F4F6', fontFamily: 'Inter, sans-serif' }}>
       <nav style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: '#1a56db', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ color: 'white', fontWeight: 700, fontSize: 16 }}>N</span>
-          </div>
+          <Avatar
+          userId={adminUser?.id || 'admin'}
+          avatarUrl={adminUser?.avatar_url || null}
+          name={adminUser?.full_name || 'Admin'}
+          color="#1a56db"
+          size={36}
+          onUpdate={url => setAdminUser((u: any) => ({ ...u, avatar_url: url }))}
+        />
           <div>
             <div style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>Nazareth School</div>
             <div style={{ fontSize: 11, color: '#6B7280' }}>Admin Dashboard</div>

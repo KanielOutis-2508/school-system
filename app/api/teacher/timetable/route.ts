@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
@@ -12,25 +13,38 @@ export async function GET() {
     const payload = verifyToken(token);
     if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // Get class timetable (for form teachers)
     const { data: teacher } = await supabase
       .from('users')
       .select('class_id')
       .eq('id', payload.id)
       .single();
 
-    const [classTimetable, teacherTimetable] = await Promise.all([
-      teacher?.class_id
-        ? supabase.from('timetable').select('*').eq('class_id', teacher.class_id).order('day').order('period')
-        : { data: [] },
-      supabase.from('teacher_timetable').select('*').eq('teacher_id', payload.id).order('day').order('start_time'),
-    ]);
+    let classTimetable: any[] = [];
+    if (teacher?.class_id) {
+      const { data } = await supabase
+        .from('timetable')
+        .select('*')
+        .eq('class_id', teacher.class_id)
+        .order('day')
+        .order('period');
+      classTimetable = data ?? [];
+    }
+
+    const { data: teacherTimetable } = await supabase
+      .from('teacher_timetable')
+      .select('*')
+      .eq('teacher_id', payload.id)
+      .order('day')
+      .order('start_time');
+
+    console.log('Timetable fetched successfully');
 
     return NextResponse.json({
-      classTimetable: classTimetable.data ?? [],
-      teacherTimetable: teacherTimetable.data ?? [],
+      classTimetable,
+      teacherTimetable: teacherTimetable ?? [],
     });
-  } catch {
+  } catch (err) {
+    console.error('Timetable GET error:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
@@ -44,7 +58,10 @@ export async function POST(request: NextRequest) {
     const payload = verifyToken(token);
     if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { type, ...data } = await request.json();
+    const body = await request.json();
+    console.log('Timetable POST body:', body);
+
+    const { type, ...data } = body;
 
     if (type === 'class') {
       const { data: teacher } = await supabase
@@ -54,7 +71,7 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (!teacher?.class_id) {
-        return NextResponse.json({ error: 'No class assigned' }, { status: 400 });
+        return NextResponse.json({ error: 'No class assigned to you' }, { status: 400 });
       }
 
       const { data: entry, error } = await supabase
@@ -71,6 +88,7 @@ export async function POST(request: NextRequest) {
         .select()
         .single();
 
+      console.log('Class timetable entry:', entry, 'Error:', error);
       if (error) throw error;
       return NextResponse.json({ entry });
     }
@@ -89,12 +107,14 @@ export async function POST(request: NextRequest) {
         .select()
         .single();
 
+      console.log('Personal timetable entry:', entry, 'Error:', error);
       if (error) throw error;
       return NextResponse.json({ entry });
     }
 
     return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
-  } catch {
+  } catch (err) {
+    console.error('Timetable POST error:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
@@ -117,7 +137,8 @@ export async function DELETE(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error('Timetable DELETE error:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

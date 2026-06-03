@@ -1,5 +1,6 @@
 'use client';
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import Avatar from '@/components/Avatar';
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -27,9 +28,14 @@ export default function TeacherDashboard() {
       {/* Navbar */}
       <nav style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ color: 'white', fontWeight: 700, fontSize: 16 }}>N</span>
-          </div>
+         <Avatar
+          userId={teacher?.id || 'teacher'}
+          avatarUrl={teacher?.avatar_url || null}
+          name={teacher?.full_name || 'Teacher'}
+          color="#059669"
+          size={36}
+          onUpdate={url => setTeacher((t: any) => ({ ...t, avatar_url: url }))}
+/>
           <div>
             <div style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>
               {teacher ? teacher.full_name : 'Teacher'}
