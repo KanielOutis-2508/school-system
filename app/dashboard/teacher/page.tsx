@@ -4,7 +4,7 @@ import Avatar from '@/components/Avatar';
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 
-const TABS = ['Overview', 'Students', 'Add Student', 'Results', 'Behaviour', 'Assignments', 'Attendance', 'Timetable', 'Ranking'];
+const TABS = ['Overview', 'Students', 'Add Student', 'Results', 'Behaviour', 'Assignments', 'Attendance', 'Timetable', 'Ranking', 'Messages'];
 
 export default function TeacherDashboard() {
   const router = useRouter();
@@ -73,6 +73,7 @@ export default function TeacherDashboard() {
         {activeTab === 'Add Student' && <AddStudentTab teacher={teacher} />}
         {activeTab === 'Timetable' && <TimetableTab teacher={teacher} />}
         {activeTab === 'Ranking' && <ClassRanking teacher={teacher} />}
+        {activeTab === 'Messages' && <TeacherMessages teacher={teacher} />}
       </div>
     </main>
   );
@@ -948,6 +949,75 @@ function TimetableTab({ teacher }: { teacher: any }) {
               </div>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+function TeacherMessages({ teacher }: { teacher: any }) {
+  const [broadcasts, setBroadcasts] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!teacher) return;
+    fetch('/api/teacher/broadcast')
+      .then(r => r.json())
+      .then(d => { if (d.broadcasts) setBroadcasts(d.broadcasts); });
+  }, [teacher]);
+
+  const markRead = async (id: string) => {
+    await fetch('/api/teacher/broadcast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ broadcast_id: id }),
+    });
+    setBroadcasts(prev => prev.map(b => b.id === id ? { ...b, read: true } : b));
+  };
+
+  const unreadCount = broadcasts.filter(b => !b.read).length;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>Messages from Admin</h3>
+        {unreadCount > 0 && (
+          <span style={{ background: '#DC2626', color: 'white', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20 }}>
+            {unreadCount} unread
+          </span>
+        )}
+      </div>
+
+      {broadcasts.length === 0 ? (
+        <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+          <p style={{ fontSize: 13, color: '#9CA3AF' }}>No messages yet.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {broadcasts.map(b => (
+            <div key={b.id} style={{
+              background: 'white', borderRadius: 12, padding: 20,
+              boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+              borderLeft: b.read ? '3px solid #E5E7EB' : '3px solid #1a56db',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>{b.title}</div>
+                  {!b.read && (
+                    <span style={{ background: '#EFF6FF', color: '#1a56db', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>NEW</span>
+                  )}
+                </div>
+                {!b.read && (
+                  <button onClick={() => markRead(b.id)}
+                    style={{ fontSize: 11, background: '#F3F4F6', color: '#6B7280', border: 'none', borderRadius: 4, padding: '4px 10px', cursor: 'pointer', flexShrink: 0 }}>
+                    Mark as read
+                  </button>
+                )}
+              </div>
+              <p style={{ fontSize: 13, color: '#374151', lineHeight: 1.6, margin: 0 }}>{b.message}</p>
+              <div style={{ fontSize: 10, color: '#9CA3AF', marginTop: 10 }}>
+                {new Date(b.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

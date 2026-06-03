@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Avatar from '@/components/Avatar';
 
-const TABS = ['Overview', 'Teachers', 'Students', 'Classes', 'Fees'];
+const TABS = ['Overview', 'Teachers', 'Students', 'Classes', 'Fees', 'Broadcast'];
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -92,6 +92,7 @@ export default function AdminDashboard() {
         {activeTab === 'Students' && <StudentsTab />}
         {activeTab === 'Classes' && <ClassesTab />}
         {activeTab === 'Fees' && <FeesTab />}
+        {activeTab === 'Broadcast' && <BroadcastTab />}
       </div>
     </main>
   );
@@ -493,6 +494,100 @@ function FeesTab() {
               </div>
             );
           })}
+        </div>
+      </div>
+    </div>
+  );
+}
+function BroadcastTab() {
+  const [broadcasts, setBroadcasts] = useState<any[]>([]);
+  const [form, setForm] = useState({ title: '', message: '' });
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    fetch('/api/admin/broadcast')
+      .then(r => r.json())
+      .then(d => { if (d.broadcasts) setBroadcasts(d.broadcasts); });
+  }, []);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    const res = await fetch('/api/admin/broadcast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setMsg('Message sent!');
+      setBroadcasts(b => [data.broadcast, ...b]);
+      setForm({ title: '', message: '' });
+    } else { setMsg(data.error); }
+    setLoading(false);
+  };
+
+  const deleteBroadcast = async (id: string) => {
+    if (!confirm('Delete this message?')) return;
+    await fetch('/api/admin/broadcast', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    setBroadcasts(b => b.filter(x => x.id !== id));
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '9px 12px', border: '1.5px solid #E5E7EB',
+    borderRadius: 7, fontSize: 13, boxSizing: 'border-box', outline: 'none', color: '#111827',
+  };
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+      <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        <h3 style={{ fontSize: 15, fontWeight: 600, color: '#111827', marginBottom: 20 }}>Send Broadcast Message</h3>
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Title</label>
+            <input required type="text" value={form.title}
+              onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
+              placeholder="e.g. Staff Meeting Tomorrow"
+              style={inputStyle} />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Message</label>
+            <textarea required rows={5} value={form.message}
+              onChange={e => setForm(p => ({ ...p, message: e.target.value }))}
+              placeholder="Type your message to all teachers..."
+              style={{ ...inputStyle, resize: 'none' }} />
+          </div>
+          {msg && <p style={{ fontSize: 12, color: msg === 'Message sent!' ? '#059669' : '#DC2626' }}>{msg}</p>}
+          <button type="submit" disabled={loading} style={{ background: '#1a56db', color: 'white', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            {loading ? 'Sending...' : '📢 Send to All Teachers'}
+          </button>
+        </form>
+      </div>
+
+      <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        <h3 style={{ fontSize: 15, fontWeight: 600, color: '#111827', marginBottom: 20 }}>Sent Messages ({broadcasts.length})</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {broadcasts.length === 0 && <p style={{ fontSize: 13, color: '#9CA3AF' }}>No messages sent yet.</p>}
+          {broadcasts.map(b => (
+            <div key={b.id} style={{ padding: '14px', background: '#F9FAFB', borderRadius: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{b.title}</div>
+                <button onClick={() => deleteBroadcast(b.id)}
+                  style={{ fontSize: 11, background: '#FEF2F2', color: '#DC2626', border: 'none', borderRadius: 4, padding: '3px 8px', cursor: 'pointer', flexShrink: 0, marginLeft: 8 }}>
+                  Delete
+                </button>
+              </div>
+              <p style={{ fontSize: 12, color: '#6B7280', margin: 0, lineHeight: 1.5 }}>{b.message}</p>
+              <div style={{ fontSize: 10, color: '#9CA3AF', marginTop: 8 }}>
+                {new Date(b.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
