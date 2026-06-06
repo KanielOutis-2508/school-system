@@ -4,8 +4,7 @@ import Avatar from '@/components/Avatar';
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 
-const TABS = ['Overview', 'Students', 'Add Student', 'Results', 'Behaviour', 'Assignments', 'Attendance', 'Timetable', 'Ranking', 'Messages'];
-
+const TABS = ['Overview', 'Students', 'Add Student', 'Results', 'Send Results', 'Incoming Results', 'Behaviour', 'Assignments', 'Attendance', 'Timetable', 'Ranking', 'Messages'];
 export default function TeacherDashboard() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('Overview');
@@ -74,6 +73,8 @@ export default function TeacherDashboard() {
         {activeTab === 'Timetable' && <TimetableTab teacher={teacher} />}
         {activeTab === 'Ranking' && <ClassRanking teacher={teacher} />}
         {activeTab === 'Messages' && <TeacherMessages teacher={teacher} />}
+        {activeTab === 'Send Results' && <SendResults teacher={teacher} />}
+        {activeTab === 'Incoming Results' && <IncomingResults teacher={teacher} />}
       </div>
     </main>
   );
@@ -1018,6 +1019,420 @@ function TeacherMessages({ teacher }: { teacher: any }) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+function SendResults({ teacher }: { teacher: any }) {
+  const [allStudents, setAllStudents] = useState<any[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [teachers, setTeachers] = useState<any[]>([]);
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [selectedClass, setSelectedClass] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    student_id: '', subject_id: '', term: 'first', school_level: 'junior',
+    to_teacher_id: '', exam_score: '', test_score: '', midterm_score: '',
+    classwork_score: '', assignment_score: '', note_score: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    if (!teacher) return;
+    fetch('/api/admin/classes').then(r => r.json()).then(d => { if (d.classes) setClasses(d.classes); });
+    fetch('/api/admin/subjects').then(r => r.json()).then(d => { if (d.subjects) setSubjects(d.subjects); });
+    fetch('/api/admin/teachers').then(r => r.json()).then(d => { if (d.teachers) setTeachers(d.teachers.filter((t: any) => t.id !== teacher?.id)); });
+    fetch('/api/teacher/submit-results').then(r => r.json()).then(d => { if (d.submissions) setSubmissions(d.submissions); });
+  }, [teacher]);
+
+  useEffect(() => {
+  const fetchStudents = async () => {
+    if (!selectedClass) {
+      setAllStudents([]);
+      return;
+    }
+    const res = await fetch(`/api/admin/students?class_id=${selectedClass}`);
+    const d = await res.json();
+    if (d.students) setAllStudents(d.students);
+  };
+  fetchStudents();
+}, [selectedClass]);
+
+  const isSenior = form.school_level === 'senior';
+
+  const total = isSenior
+    ? Number(form.exam_score || 0) + Number(form.test_score || 0) + Number(form.midterm_score || 0) + Number(form.note_score || 0)
+    : Number(form.exam_score || 0) + Number(form.test_score || 0) + Number(form.midterm_score || 0) + Number(form.classwork_score || 0) + Number(form.assignment_score || 0) + Number(form.note_score || 0);
+
+  // Students who already have a pending/approved submission for selected subject+term
+  const doneStudentIds = new Set(
+    submissions
+      .filter(s => s.subject_id === form.subject_id && s.term === form.term)
+      .map(s => s.student_id)
+  );
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    if (editingId) {
+      // Update existing submission
+      const res = await fetch('/api/teacher/submit-results', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editingId, ...form }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMsg('Result updated!');
+        setSubmissions(prev => prev.map(s => s.id === editingId ? { ...s, ...data.submission } : s));
+        setEditingId(null);
+        setForm({ student_id: '', subject_id: form.subject_id, term: form.term, school_level: form.school_level, to_teacher_id: form.to_teacher_id, exam_score: '', test_score: '', midterm_score: '', classwork_score: '', assignment_score: '', note_score: '' });
+      } else { setMsg(data.error); }
+    } else {
+      const res = await fetch('/api/teacher/submit-results', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMsg(`✓ Result saved for student!`);
+        setSubmissions(s => [data.submission, ...s]);
+        setForm(p => ({ ...p, student_id: '', exam_score: '', test_score: '', midterm_score: '', classwork_score: '', assignment_score: '', note_score: '' }));
+      } else { setMsg(data.error); }
+    }
+    setLoading(false);
+  };
+
+  const startEdit = (s: any) => {
+    setEditingId(s.id);
+    setForm({
+      student_id: s.student_id,
+      subject_id: s.subject_id,
+      term: s.term,
+      school_level: s.school_level || 'junior',
+      to_teacher_id: s.to_teacher_id,
+      exam_score: s.exam_score?.toString() || '',
+      test_score: s.test_score?.toString() || '',
+      midterm_score: s.midterm_score?.toString() || '',
+      classwork_score: s.classwork_score?.toString() || '',
+      assignment_score: s.assignment_score?.toString() || '',
+      note_score: s.note_score?.toString() || '',
+    });
+    setMsg('Editing result — make changes and save.');
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setForm({ student_id: '', subject_id: form.subject_id, term: form.term, school_level: form.school_level, to_teacher_id: form.to_teacher_id, exam_score: '', test_score: '', midterm_score: '', classwork_score: '', assignment_score: '', note_score: '' });
+    setMsg('');
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '9px 12px', border: '1.5px solid #E5E7EB',
+    borderRadius: 7, fontSize: 13, boxSizing: 'border-box', outline: 'none', color: '#111827',
+  };
+
+  const scoreFields = isSenior ? [
+    { label: 'Exam Score', key: 'exam_score', max: 60 },
+    { label: 'Test Score', key: 'test_score', max: 20 },
+    { label: 'Mid Term Project', key: 'midterm_score', max: 10 },
+    { label: 'Note Score', key: 'note_score', max: 10 },
+  ] : [
+    { label: 'Exam Score', key: 'exam_score', max: 40 },
+    { label: 'Test Score', key: 'test_score', max: 20 },
+    { label: 'Mid Term Project', key: 'midterm_score', max: 10 },
+    { label: 'Classwork Score', key: 'classwork_score', max: 10 },
+    { label: 'Assignment Score', key: 'assignment_score', max: 10 },
+    { label: 'Note Score', key: 'note_score', max: 10 },
+  ];
+
+  const statusColor = (s: string) => {
+    if (s === 'approved') return { bg: '#ECFDF5', color: '#059669' };
+    if (s === 'rejected') return { bg: '#FEF2F2', color: '#DC2626' };
+    return { bg: '#FFFBEB', color: '#D97706' };
+  };
+
+  // Filter subjects by selected class
+  const filteredSubjects = selectedClass
+    ? subjects.filter(s => s.class_id === selectedClass || !s.class_id)
+    : subjects;
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+      <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>
+            {editingId ? '✏️ Edit Result' : 'Send Results to Form Teacher'}
+          </h3>
+          {editingId && (
+            <button onClick={cancelEdit} style={{ fontSize: 12, color: '#6B7280', background: '#F3F4F6', border: 'none', borderRadius: 6, padding: '5px 12px', cursor: 'pointer' }}>
+              Cancel Edit
+            </button>
+          )}
+        </div>
+
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* School Level Toggle */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>School Level</label>
+            <div style={{ display: 'flex', gap: 4, background: '#F3F4F6', borderRadius: 8, padding: 4 }}>
+              {[{ value: 'junior', label: 'Junior (JSS)' }, { value: 'senior', label: 'Senior (SSS)' }].map(l => (
+                <button key={l.value} type="button"
+                  onClick={() => setForm(p => ({ ...p, school_level: l.value, exam_score: '', test_score: '', midterm_score: '', classwork_score: '', assignment_score: '', note_score: '' }))}
+                  style={{
+                    flex: 1, padding: '8px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                    fontSize: 12, fontWeight: 600,
+                    background: form.school_level === l.value ? '#059669' : 'transparent',
+                    color: form.school_level === l.value ? 'white' : '#6B7280',
+                  }}>
+                  {l.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Class picker */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Class</label>
+            <select value={selectedClass} onChange={e => { setSelectedClass(e.target.value); setForm(p => ({ ...p, student_id: '' })); }} style={inputStyle}>
+              <option value="">Select class first</option>
+              {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+
+          {/* Student picker with done indicators */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>
+              Student {allStudents.length > 0 && <span style={{ color: '#9CA3AF', fontWeight: 400 }}>({doneStudentIds.size}/{allStudents.length} done)</span>}
+            </label>
+            {allStudents.length === 0 ? (
+              <div style={{ padding: '9px 12px', border: '1.5px solid #E5E7EB', borderRadius: 7, fontSize: 13, color: '#9CA3AF' }}>
+                Select a class first
+              </div>
+            ) : (
+              <div style={{ border: '1.5px solid #E5E7EB', borderRadius: 7, overflow: 'hidden', maxHeight: 180, overflowY: 'auto' }}>
+                {allStudents.map(s => {
+                  const isDone = doneStudentIds.has(s.id);
+                  const isSelected = form.student_id === s.id;
+                  return (
+                    <div key={s.id}
+                      onClick={() => setForm(p => ({ ...p, student_id: s.id }))}
+                      style={{
+                        padding: '10px 12px', cursor: 'pointer', display: 'flex',
+                        justifyContent: 'space-between', alignItems: 'center',
+                        background: isSelected ? '#EFF6FF' : 'white',
+                        borderBottom: '1px solid #F3F4F6',
+                      }}>
+                      <span style={{ fontSize: 13, color: '#111827', fontWeight: isSelected ? 600 : 400 }}>{s.full_name}</span>
+                      {isDone && <span style={{ fontSize: 11, color: '#059669', fontWeight: 700 }}>✓ Done</span>}
+                      {isSelected && !isDone && <span style={{ fontSize: 11, color: '#1a56db' }}>Selected</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Subject */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Subject</label>
+            <select required value={form.subject_id} onChange={e => setForm(p => ({ ...p, subject_id: e.target.value }))} style={inputStyle}>
+              <option value="">Select subject</option>
+              {filteredSubjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+
+          {/* Term */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Term</label>
+            <select value={form.term} onChange={e => setForm(p => ({ ...p, term: e.target.value }))} style={inputStyle}>
+              <option value="first">First Term</option>
+              <option value="second">Second Term</option>
+              <option value="third">Third Term</option>
+            </select>
+          </div>
+
+          {/* Send to Form Teacher */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Send to Form Teacher</label>
+            <select required value={form.to_teacher_id} onChange={e => setForm(p => ({ ...p, to_teacher_id: e.target.value }))} style={inputStyle}>
+              <option value="">Select form teacher</option>
+              {teachers.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
+            </select>
+          </div>
+
+          {/* Score fields */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {scoreFields.map(f => (
+              <div key={f.key}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>
+                  {f.label} <span style={{ color: '#9CA3AF', fontWeight: 400 }}>(max {f.max})</span>
+                </label>
+                <input type="number" min="0" max={f.max}
+                  value={(form as any)[f.key]}
+                  onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+                  placeholder="0" style={inputStyle} />
+              </div>
+            ))}
+          </div>
+
+          {/* Live total */}
+          <div style={{
+            background: total >= 70 ? '#ECFDF5' : total >= 50 ? '#EFF6FF' : '#FEF2F2',
+            borderRadius: 8, padding: '12px 16px',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Total</span>
+            <span style={{ fontSize: 20, fontWeight: 700, color: total >= 70 ? '#059669' : total >= 50 ? '#1a56db' : '#DC2626' }}>{total} / 100</span>
+          </div>
+
+          {msg && <p style={{ fontSize: 12, color: msg.includes('✓') || msg.includes('updated') ? '#059669' : msg.includes('Editing') ? '#D97706' : '#DC2626' }}>{msg}</p>}
+
+          <button type="submit" disabled={loading || !form.student_id}
+            style={{ background: editingId ? '#D97706' : '#059669', color: 'white', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: !form.student_id ? 0.5 : 1 }}>
+            {loading ? 'Saving...' : editingId ? 'Update Result' : 'Send Result'}
+          </button>
+        </form>
+      </div>
+
+      {/* Sent results with edit option */}
+      <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        <h3 style={{ fontSize: 15, fontWeight: 600, color: '#111827', marginBottom: 20 }}>Sent Results ({submissions.length})</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 600, overflowY: 'auto' }}>
+          {submissions.length === 0 && <p style={{ fontSize: 13, color: '#9CA3AF' }}>No results sent yet.</p>}
+          {submissions.map(s => {
+            const { bg, color } = statusColor(s.status);
+            return (
+              <div key={s.id} style={{ padding: '12px 14px', background: '#F9FAFB', borderRadius: 8, border: editingId === s.id ? '2px solid #D97706' : 'none' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{s.subjects?.name}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: bg, color }}>
+                      {s.status.charAt(0).toUpperCase() + s.status.slice(1)}
+                    </span>
+                    {s.status === 'pending' && (
+                      <button onClick={() => startEdit(s)}
+                        style={{ fontSize: 11, background: '#FFFBEB', color: '#D97706', border: 'none', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}>
+                        Edit
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div style={{ fontSize: 11, color: '#6B7280' }}>Total: {s.total}/100 · Grade: {s.grade} · {s.term} term</div>
+                {s.note && <div style={{ fontSize: 11, color: '#374151', marginTop: 4 }}>Note: {s.note}</div>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function IncomingResults({ teacher }: { teacher: any }) {
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [note, setNote] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!teacher) return;
+    fetch('/api/teacher/incoming-results')
+      .then(r => r.json())
+      .then(d => { if (d.submissions) setSubmissions(d.submissions); });
+  }, [teacher]);
+
+  const handle = async (id: string, action: 'approve' | 'reject') => {
+    const res = await fetch('/api/teacher/incoming-results', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, action, note: note[id] || '' }),
+    });
+    if (res.ok) {
+      setSubmissions(prev => prev.map(s => s.id === id ? { ...s, status: action === 'approve' ? 'approved' : 'rejected' } : s));
+    }
+  };
+
+  const pending = submissions.filter(s => s.status === 'pending');
+  const processed = submissions.filter(s => s.status !== 'pending');
+
+  const statusColor = (s: string) => {
+    if (s === 'approved') return { bg: '#ECFDF5', color: '#059669' };
+    if (s === 'rejected') return { bg: '#FEF2F2', color: '#DC2626' };
+    return { bg: '#FFFBEB', color: '#D97706' };
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* Pending */}
+      <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>Pending Results</h3>
+          {pending.length > 0 && (
+            <span style={{ background: '#DC2626', color: 'white', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20 }}>
+              {pending.length}
+            </span>
+          )}
+        </div>
+        {pending.length === 0 ? (
+          <p style={{ fontSize: 13, color: '#9CA3AF' }}>No pending results.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {pending.map(s => (
+              <div key={s.id} style={{ padding: '16px', background: '#FFFBEB', borderRadius: 8, border: '1px solid #FDE68A' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{s.subjects?.name}</div>
+                    <div style={{ fontSize: 11, color: '#6B7280' }}>Total: {s.total}/100 · Grade: {s.grade} · {s.term} term</div>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#6B7280', textAlign: 'right' }}>
+                    From: {s['users!result_submissions_from_teacher_id_fkey']?.full_name}
+                  </div>
+                </div>
+                <input type="text" placeholder="Add note (optional)"
+                  value={note[s.id] || ''}
+                  onChange={e => setNote(n => ({ ...n, [s.id]: e.target.value }))}
+                  style={{ width: '100%', padding: '7px 10px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 12, outline: 'none', color: '#111827', boxSizing: 'border-box', marginBottom: 10 }} />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => handle(s.id, 'approve')}
+                    style={{ flex: 1, padding: '8px', background: '#059669', color: 'white', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                    ✓ Approve
+                  </button>
+                  <button onClick={() => handle(s.id, 'reject')}
+                    style={{ flex: 1, padding: '8px', background: '#DC2626', color: 'white', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                    ✕ Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Processed */}
+      {processed.length > 0 && (
+        <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+          <h3 style={{ fontSize: 15, fontWeight: 600, color: '#111827', marginBottom: 20 }}>Processed Results</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {processed.map(s => {
+              const { bg, color } = statusColor(s.status);
+              return (
+                <div key={s.id} style={{ padding: '12px 14px', background: '#F9FAFB', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{s.subjects?.name}</div>
+                    <div style={{ fontSize: 11, color: '#6B7280' }}>Total: {s.total}/100 · Grade: {s.grade}</div>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: bg, color }}>
+                    {s.status.charAt(0).toUpperCase() + s.status.slice(1)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

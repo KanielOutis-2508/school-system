@@ -63,13 +63,13 @@ export default function LoginPage() {
             background: '#1a56db', margin: '0 auto 12px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <span style={{ color: 'white', fontSize: 22, fontWeight: 700 }}>N</span>
+            <span style={{ color: 'white', fontSize: 18, fontWeight: 700 }}>SMS</span>
           </div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: '#111827', margin: 0 }}>
-            Nazareth School
+           School Management System
           </h1>
           <p style={{ fontSize: 14, color: '#6B7280', marginTop: 4 }}>
-            Student Management System
+            School Management System
           </p>
         </div>
 

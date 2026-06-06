@@ -7,14 +7,21 @@ function generateStudentId() {
   return `NAZ-STD-${num}`;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const { data: students, error } = await supabase
+    const { searchParams } = new URL(request.url);
+    const class_id = searchParams.get('class_id');
+
+    let query = supabase
       .from('users')
       .select('*')
-      .eq('role', 'student')
-      .order('created_at', { ascending: false });
+      .eq('role', 'student');
 
+    if (class_id) {
+      query = query.eq('class_id', class_id);
+    }
+
+    const { data: students, error } = await query.order('full_name');
     if (error) throw error;
     return NextResponse.json({ students });
   } catch {

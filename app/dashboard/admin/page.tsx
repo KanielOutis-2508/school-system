@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Avatar from '@/components/Avatar';
 
-const TABS = ['Overview', 'Teachers', 'Students', 'Classes', 'Fees', 'Broadcast'];
+const TABS = ['Overview', 'Teachers', 'Students', 'Classes', 'Subjects', 'Fees', 'Broadcast', 'Promotion'];
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -40,7 +40,7 @@ export default function AdminDashboard() {
             onUpdate={url => setAdminUser((u: any) => ({ ...u, avatar_url: url }))}
           />
           <div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>Nazareth School</div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>School Management System</div>
             <div style={{ fontSize: 11, color: '#6B7280' }}>Admin Dashboard</div>
           </div>
         </div>
@@ -93,6 +93,8 @@ export default function AdminDashboard() {
         {activeTab === 'Classes' && <ClassesTab />}
         {activeTab === 'Fees' && <FeesTab />}
         {activeTab === 'Broadcast' && <BroadcastTab />}
+        {activeTab === 'Subjects' && <SubjectsTab />}
+        {activeTab === 'Promotion' && <PromotionTab />}
       </div>
     </main>
   );
@@ -589,6 +591,269 @@ function BroadcastTab() {
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+function SubjectsTab() {
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [teachers, setTeachers] = useState<any[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
+  const [form, setForm] = useState({ name: '', teacher_id: '' });
+  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    fetch('/api/admin/subjects').then(r => r.json()).then(d => { if (d.subjects) setSubjects(d.subjects); });
+    fetch('/api/admin/teachers').then(r => r.json()).then(d => { if (d.teachers) setTeachers(d.teachers); });
+    fetch('/api/admin/classes').then(r => r.json()).then(d => { if (d.classes) setClasses(d.classes); });
+  }, []);
+
+  const toggleClass = (id: string) => {
+    setSelectedClasses(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    const res = await fetch('/api/admin/subjects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...form, class_ids: selectedClasses }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setMsg(`Subject created for ${selectedClasses.length || 'all'} class(es)!`);
+      setSubjects(s => [...s, ...(data.subjects || [])]);
+      setForm({ name: '', teacher_id: '' });
+      setSelectedClasses([]);
+    } else { setMsg(data.error); }
+    setLoading(false);
+  };
+
+  const deleteSubject = async (id: string) => {
+    if (!confirm('Delete this subject?')) return;
+    await fetch('/api/admin/subjects', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    setSubjects(s => s.filter(x => x.id !== id));
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '9px 12px', border: '1.5px solid #E5E7EB',
+    borderRadius: 7, fontSize: 13, boxSizing: 'border-box', outline: 'none', color: '#111827',
+  };
+
+  // Group subjects by name and teacher
+  const grouped = subjects.reduce((acc: any, s) => {
+    const key = `${s.name}__${s.teacher_id}`;
+    if (!acc[key]) acc[key] = { ...s, class_ids: [] };
+    if (s.class_id) acc[key].class_ids.push(s.class_id);
+    return acc;
+  }, {});
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+      <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        <h3 style={{ fontSize: 15, fontWeight: 600, color: '#111827', marginBottom: 20 }}>Create Subject</h3>
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Subject Name</label>
+            <input required type="text" value={form.name}
+              onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+              placeholder="e.g. Mathematics"
+              style={inputStyle} />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 5 }}>Assign Teacher</label>
+            <select value={form.teacher_id} onChange={e => setForm(p => ({ ...p, teacher_id: e.target.value }))} style={inputStyle}>
+              <option value="">Select teacher</option>
+              {teachers.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
+              Assign Classes <span style={{ color: '#9CA3AF', fontWeight: 400 }}>({selectedClasses.length} selected)</span>
+            </label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {classes.map(c => (
+                <button key={c.id} type="button" onClick={() => toggleClass(c.id)}
+                  style={{
+                    padding: '6px 14px', borderRadius: 20, border: '1.5px solid',
+                    fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                    borderColor: selectedClasses.includes(c.id) ? '#1a56db' : '#E5E7EB',
+                    background: selectedClasses.includes(c.id) ? '#EFF6FF' : 'white',
+                    color: selectedClasses.includes(c.id) ? '#1a56db' : '#6B7280',
+                  }}>
+                  {c.name}
+                </button>
+              ))}
+            </div>
+          </div>
+          {msg && <p style={{ fontSize: 12, color: msg.includes('created') ? '#059669' : '#DC2626' }}>{msg}</p>}
+          <button type="submit" disabled={loading} style={{ background: '#1a56db', color: 'white', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            {loading ? 'Creating...' : 'Create Subject'}
+          </button>
+        </form>
+      </div>
+
+      <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        <h3 style={{ fontSize: 15, fontWeight: 600, color: '#111827', marginBottom: 20 }}>All Subjects ({Object.keys(grouped).length})</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {Object.keys(grouped).length === 0 && <p style={{ fontSize: 13, color: '#9CA3AF' }}>No subjects yet.</p>}
+          {Object.values(grouped).map((s: any) => (
+            <div key={s.id} style={{ padding: '12px 14px', background: '#F9FAFB', borderRadius: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{s.name}</div>
+                <button onClick={() => {
+                  // Delete all entries for this subject+teacher combo
+                  subjects.filter(x => x.name === s.name && x.teacher_id === s.teacher_id)
+                    .forEach(x => deleteSubject(x.id));
+                }}
+                  style={{ fontSize: 11, background: '#FEF2F2', color: '#DC2626', border: 'none', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}>
+                  Delete
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: '#6B7280', marginBottom: 6 }}>
+                {teachers.find(t => t.id === s.teacher_id)?.full_name || 'No teacher'}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {s.class_ids.map((cid: string) => (
+                  <span key={cid} style={{ fontSize: 10, background: '#EFF6FF', color: '#1a56db', padding: '2px 8px', borderRadius: 20 }}>
+                    {classes.find(c => c.id === cid)?.name || cid}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+function PromotionTab() {
+  const [classes, setClasses] = useState<any[]>([]);
+  const [allClasses, setAllClasses] = useState<any[]>([]);
+  const [decisions, setDecisions] = useState<Record<string, { status: string; to_class_id: string }>>({});
+  const [academicYear, setAcademicYear] = useState('2024/2025');
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    fetch('/api/admin/promote').then(r => r.json()).then(d => { if (d.classes) setClasses(d.classes); });
+    fetch('/api/admin/classes').then(r => r.json()).then(d => { if (d.classes) setAllClasses(d.classes); });
+  }, []);
+
+  const setDecision = (studentId: string, field: string, value: string) => {
+    setDecisions(prev => ({
+      ...prev,
+      [studentId]: { ...prev[studentId], [field]: value },
+    }));
+  };
+
+  const submit = async () => {
+    setLoading(true);
+    const promotions = Object.entries(decisions).map(([student_id, d]) => ({
+      student_id,
+      from_class_id: classes.find(c => c.users?.find((u: any) => u.id === student_id))?.id,
+      to_class_id: d.to_class_id || null,
+      status: d.status || 'promoted',
+    }));
+
+    const res = await fetch('/api/admin/promote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ promotions, academic_year: academicYear }),
+    });
+
+    if (res.ok) {
+      setMsg('Promotions applied successfully!');
+      // Refresh classes
+      fetch('/api/admin/promote').then(r => r.json()).then(d => { if (d.classes) setClasses(d.classes); });
+    } else {
+      setMsg('Error applying promotions');
+    }
+    setLoading(false);
+  };
+
+  const inputStyle: React.CSSProperties = {
+    padding: '6px 10px', border: '1px solid #E5E7EB',
+    borderRadius: 6, fontSize: 12, outline: 'none', color: '#111827',
+  };
+
+  return (
+    <div>
+      <div style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', marginBottom: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+          <div>
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: '#111827', marginBottom: 4 }}>End of Session Promotion</h3>
+            <p style={{ fontSize: 12, color: '#6B7280' }}>Set promotion status for each student. Promoted students will move to their new class.</p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Academic Year</label>
+              <input type="text" value={academicYear} onChange={e => setAcademicYear(e.target.value)} style={{ ...inputStyle, width: 120 }} />
+            </div>
+            <button onClick={submit} disabled={loading || Object.keys(decisions).length === 0}
+              style={{ background: '#1a56db', color: 'white', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer', marginTop: 20 }}>
+              {loading ? 'Applying...' : 'Apply Promotions'}
+            </button>
+          </div>
+        </div>
+        {msg && <p style={{ fontSize: 12, color: msg.includes('successfully') ? '#059669' : '#DC2626', marginTop: 12 }}>{msg}</p>}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {classes.map(cls => (
+          cls.users?.filter((u: any) => u.id).length > 0 ? (
+            <div key={cls.id} style={{ background: 'white', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+              <h4 style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginBottom: 16 }}>
+                {cls.name} <span style={{ fontSize: 12, color: '#6B7280', fontWeight: 400 }}>({cls.users?.length} students)</span>
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {cls.users?.map((student: any) => (
+                  <div key={student.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 12, alignItems: 'center', padding: '10px 14px', background: '#F9FAFB', borderRadius: 8 }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: '#111827' }}>{student.full_name}</div>
+                      <div style={{ fontSize: 11, color: '#6B7280' }}>{student.unique_id}</div>
+                    </div>
+                    <select
+                      value={decisions[student.id]?.status || ''}
+                      onChange={e => setDecision(student.id, 'status', e.target.value)}
+                      style={inputStyle}>
+                      <option value="">Select action</option>
+                      <option value="promoted">Promote</option>
+                      <option value="repeated">Repeat Class</option>
+                      <option value="graduated">Graduate (SS3)</option>
+                    </select>
+                    {decisions[student.id]?.status === 'promoted' && (
+                      <select
+                        value={decisions[student.id]?.to_class_id || ''}
+                        onChange={e => setDecision(student.id, 'to_class_id', e.target.value)}
+                        style={inputStyle}>
+                        <option value="">Move to class...</option>
+                        {allClasses.filter(c => c.id !== cls.id).map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    )}
+                    {decisions[student.id]?.status === 'graduated' && (
+                      <span style={{ fontSize: 11, color: '#059669', fontWeight: 600 }}>🎓 Will graduate</span>
+                    )}
+                    {decisions[student.id]?.status === 'repeated' && (
+                      <span style={{ fontSize: 11, color: '#D97706', fontWeight: 600 }}>🔄 Will repeat</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null
+        ))}
       </div>
     </div>
   );

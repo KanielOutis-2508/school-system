@@ -12,10 +12,17 @@ export async function GET() {
     const payload = verifyToken(token);
     if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const { data: teacher } = await supabase
+      .from('users')
+      .select('class_id')
+      .eq('id', payload.id)
+      .single();
+
+    // Get subjects assigned to this teacher OR to their class
     const { data: subjects } = await supabase
       .from('subjects')
       .select('*')
-      .eq('teacher_id', payload.id)
+      .or(`teacher_id.eq.${payload.id},class_id.eq.${teacher?.class_id || '00000000-0000-0000-0000-000000000000'}`)
       .order('name');
 
     return NextResponse.json({ subjects: subjects ?? [] });
