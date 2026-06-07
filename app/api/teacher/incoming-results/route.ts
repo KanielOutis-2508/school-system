@@ -12,14 +12,17 @@ export async function GET() {
     const payload = verifyToken(token);
     if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: submissions } = await supabase
+    const { data: submissions, error } = await supabase
       .from('result_submissions')
-      .select('*, subjects(name), users!result_submissions_student_id_fkey(full_name), users!result_submissions_from_teacher_id_fkey(full_name)')
+      .select('*, subjects(name)')
       .eq('to_teacher_id', payload.id)
       .order('created_at', { ascending: false });
 
+    console.log('Incoming results GET:', submissions, error);
+
     return NextResponse.json({ submissions: submissions ?? [] });
-  } catch {
+  } catch (err) {
+    console.error('Incoming results GET error:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

@@ -36,13 +36,13 @@ export default function TeacherDashboard() {
           onUpdate={url => setTeacher((t: any) => ({ ...t, avatar_url: url }))}
 />
           <div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>
-              {teacher ? teacher.full_name : 'Teacher'}
+             <div style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>
+                 {teacher ? teacher.full_name : 'Teacher'}
             </div>
-            <div style={{ fontSize: 11, color: '#6B7280' }}>
-              Teacher · {teacher?.unique_id}
+             <div style={{ fontSize: 11, color: '#6B7280' }}>
+              Teacher · {teacher?.unique_id} {teacher?.class_name ? `· ${teacher.class_name}` : '· No class assigned'}
+               </div>
             </div>
-          </div>
         </div>
         <button onClick={logout} style={{ fontSize: 13, color: '#6B7280', background: 'none', border: '1px solid #E5E7EB', borderRadius: 6, padding: '6px 14px', cursor: 'pointer' }}>
           Sign Out

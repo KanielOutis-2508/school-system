@@ -39,8 +39,8 @@ export default function StudentDashboard() {
             <div style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>
               {student ? student.full_name : 'Student'}
             </div>
-            <div style={{ fontSize: 11, color: '#6B7280' }}>
-              Student · {student?.unique_id}
+           <div style={{ fontSize: 11, color: '#6B7280' }}>
+              Student · {student?.unique_id} {student?.class_name ? `· ${student.class_name}` : ''}
             </div>
           </div>
         </div>

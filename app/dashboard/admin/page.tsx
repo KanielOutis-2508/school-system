@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Avatar from '@/components/Avatar';
 
-const TABS = ['Overview', 'Teachers', 'Students', 'Classes', 'Subjects', 'Fees', 'Broadcast', 'Promotion'];
+const TABS = ['Overview', 'Teachers', 'Students', 'Classes', 'Subjects', 'Fees', 'Broadcast', 'Promotion', 'Class Overview'];
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -95,6 +95,7 @@ export default function AdminDashboard() {
         {activeTab === 'Broadcast' && <BroadcastTab />}
         {activeTab === 'Subjects' && <SubjectsTab />}
         {activeTab === 'Promotion' && <PromotionTab />}
+        {activeTab === 'Class Overview' && <ClassOverviewTab />}
       </div>
     </main>
   );
@@ -855,6 +856,297 @@ function PromotionTab() {
           ) : null
         ))}
       </div>
+    </div>
+  );
+}function ClassOverviewTab() {
+  const [classes, setClasses] = useState<any[]>([]);
+  const [selectedClass, setSelectedClass] = useState('');
+  const [students, setStudents] = useState<any[]>([]);
+  const [search, setSearch] = useState('');
+  const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [studentData, setStudentData] = useState<any>(null);
+  const [activeSection, setActiveSection] = useState('Results');
+  const [term, setTerm] = useState('first');
+
+  useEffect(() => {
+    fetch('/api/admin/classes').then(r => r.json()).then(d => { if (d.classes) setClasses(d.classes); });
+  }, []);
+
+ useEffect(() => {
+  const fetchStudents = async () => {
+    if (!selectedClass) {
+      setStudents([]);
+      setSelectedStudent(null);
+      setStudentData(null);
+      return;
+    }
+    const res = await fetch(`/api/admin/class-overview?class_id=${selectedClass}`);
+    const d = await res.json();
+    if (d.students) setStudents(d.students);
+  };
+  fetchStudents();
+}, [selectedClass]);
+
+  const selectStudent = async (student: any) => {
+    setSelectedStudent(student);
+    const res = await fetch(`/api/admin/class-overview?class_id=${selectedClass}&student_id=${student.id}`);
+    const d = await res.json();
+    if (d.studentData) setStudentData(d.studentData);
+  };
+
+  const filteredStudents = students.filter(s =>
+    s.full_name.toLowerCase().includes(search.toLowerCase()) ||
+    s.unique_id.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const gradeColor = (grade: string) => {
+    if (grade?.startsWith('A')) return '#059669';
+    if (grade?.startsWith('B')) return '#1a56db';
+    if (grade?.startsWith('C')) return '#D97706';
+    return '#DC2626';
+  };
+
+  const statusColor = (s: string) => {
+    if (s === 'present') return { bg: '#ECFDF5', color: '#059669' };
+    if (s === 'absent') return { bg: '#FEF2F2', color: '#DC2626' };
+    return { bg: '#FFFBEB', color: '#D97706' };
+  };
+
+  const SECTIONS = ['Results', 'Behaviour', 'Attendance', 'Fees', 'Assignments', 'Profile'];
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 24 }}>
+      {/* Left panel — class and student picker */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ background: 'white', borderRadius: 12, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>Select Class</label>
+          <select value={selectedClass} onChange={e => { setSelectedClass(e.target.value); setSelectedStudent(null); setSearch(''); }}
+            style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E5E7EB', borderRadius: 7, fontSize: 13, outline: 'none', color: '#111827' }}>
+            <option value="">Pick a class</option>
+            {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+
+        {students.length > 0 && (
+          <div style={{ background: 'white', borderRadius: 12, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+            <div style={{ marginBottom: 12 }}>
+              <input type="text" placeholder="Search student..." value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #E5E7EB', borderRadius: 7, fontSize: 13, outline: 'none', color: '#111827', boxSizing: 'border-box' }} />
+            </div>
+            <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 8 }}>{filteredStudents.length} students</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 400, overflowY: 'auto' }}>
+              {filteredStudents.map(s => (
+                <div key={s.id} onClick={() => selectStudent(s)}
+                  style={{
+                    padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
+                    background: selectedStudent?.id === s.id ? '#EFF6FF' : '#F9FAFB',
+                    border: selectedStudent?.id === s.id ? '1.5px solid #1a56db' : '1.5px solid transparent',
+                  }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: '#111827' }}>{s.full_name}</div>
+                  <div style={{ fontSize: 11, color: '#6B7280' }}>{s.unique_id}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Right panel — student data */}
+      {!selectedStudent ? (
+        <div style={{ background: 'white', borderRadius: 12, padding: 40, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <p style={{ fontSize: 14, color: '#9CA3AF', textAlign: 'center' }}>
+            Select a class and student to view their full profile
+          </p>
+        </div>
+      ) : (
+        <div>
+          {/* Student header */}
+          <div style={{ background: 'white', borderRadius: 12, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#111827' }}>{selectedStudent.full_name}</div>
+              <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>{selectedStudent.unique_id} · {classes.find(c => c.id === selectedClass)?.name}</div>
+            </div>
+            <span style={{ fontSize: 12, background: selectedStudent.school_level === 'senior' ? '#EFF6FF' : '#ECFDF5', color: selectedStudent.school_level === 'senior' ? '#1a56db' : '#059669', padding: '4px 12px', borderRadius: 20, fontWeight: 600 }}>
+              {selectedStudent.school_level === 'senior' ? 'SSS' : 'JSS'}
+            </span>
+          </div>
+
+          {/* Section tabs */}
+          <div style={{ display: 'flex', gap: 4, background: 'white', borderRadius: 10, padding: 4, marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', overflowX: 'auto' }}>
+            {SECTIONS.map(s => (
+              <button key={s} onClick={() => setActiveSection(s)} style={{
+                padding: '7px 14px', borderRadius: 7, border: 'none', cursor: 'pointer',
+                fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap',
+                background: activeSection === s ? '#1a56db' : 'transparent',
+                color: activeSection === s ? 'white' : '#6B7280',
+              }}>{s}</button>
+            ))}
+          </div>
+
+          {/* Results */}
+          {activeSection === 'Results' && (
+            <div style={{ background: 'white', borderRadius: 12, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>Results</h3>
+                <select value={term} onChange={e => setTerm(e.target.value)}
+                  style={{ padding: '6px 10px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 12, color: '#111827', outline: 'none' }}>
+                  <option value="first">First Term</option>
+                  <option value="second">Second Term</option>
+                  <option value="third">Third Term</option>
+                </select>
+              </div>
+              {studentData?.results?.filter((r: any) => r.term === term).length === 0 ? (
+                <p style={{ fontSize: 13, color: '#9CA3AF' }}>No results for this term.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {studentData?.results?.filter((r: any) => r.term === term).map((r: any) => (
+                    <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#F9FAFB', borderRadius: 8 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: '#111827' }}>{r.subjects?.name}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <span style={{ fontSize: 18, fontWeight: 700, color: gradeColor(r.grade) }}>{r.grade}</span>
+                        <span style={{ fontSize: 13, color: '#6B7280' }}>{r.score}/100</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Behaviour */}
+          {activeSection === 'Behaviour' && (
+            <div style={{ background: 'white', borderRadius: 12, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, color: '#111827', marginBottom: 16 }}>Behaviour</h3>
+              {studentData?.behaviour?.length === 0 ? (
+                <p style={{ fontSize: 13, color: '#9CA3AF' }}>No behaviour records.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {studentData?.behaviour?.map((b: any) => (
+                    <div key={b.id} style={{ padding: '14px', background: '#F9FAFB', borderRadius: 8 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <span style={{ fontSize: 12, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{b.term} Term</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: b.rating === 'Excellent' ? '#059669' : b.rating === 'Good' ? '#1a56db' : b.rating === 'Fair' ? '#D97706' : '#DC2626' }}>{b.rating}</span>
+                      </div>
+                      {b.comment && <p style={{ fontSize: 13, color: '#374151' }}>{b.comment}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Attendance */}
+          {activeSection === 'Attendance' && (
+            <div style={{ background: 'white', borderRadius: 12, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, color: '#111827', marginBottom: 16 }}>Attendance</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+                {['present', 'absent', 'late'].map(status => {
+                  const count = studentData?.attendance?.filter((a: any) => a.status === status).length ?? 0;
+                  const { bg, color } = statusColor(status);
+                  return (
+                    <div key={status} style={{ textAlign: 'center', padding: '12px', background: bg, borderRadius: 8 }}>
+                      <div style={{ fontSize: 22, fontWeight: 700, color }}>{count}</div>
+                      <div style={{ fontSize: 11, color, textTransform: 'capitalize' }}>{status}</div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 300, overflowY: 'auto' }}>
+                {studentData?.attendance?.map((a: any) => {
+                  const { bg, color } = statusColor(a.status);
+                  return (
+                    <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#F9FAFB', borderRadius: 6 }}>
+                      <span style={{ fontSize: 13, color: '#374151' }}>{a.date}</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: bg, color }}>{a.status}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Fees */}
+          {activeSection === 'Fees' && (
+            <div style={{ background: 'white', borderRadius: 12, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, color: '#111827', marginBottom: 16 }}>Fees</h3>
+              {studentData?.fees?.length === 0 ? (
+                <p style={{ fontSize: 13, color: '#9CA3AF' }}>No fees records.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {studentData?.fees?.map((f: any) => {
+                    const balance = Number(f.amount_due) - Number(f.amount_paid);
+                    const isPaid = f.status === 'paid';
+                    return (
+                      <div key={f.id} style={{ padding: '14px', background: '#F9FAFB', borderRadius: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{f.term} Term · {f.academic_year}</span>
+                          <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: isPaid ? '#ECFDF5' : '#FEF2F2', color: isPaid ? '#059669' : '#DC2626' }}>
+                            {f.status}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#6B7280' }}>
+                          <span>Due: ₦{Number(f.amount_due).toLocaleString()}</span>
+                          <span>Paid: ₦{Number(f.amount_paid).toLocaleString()}</span>
+                          <span style={{ color: balance > 0 ? '#DC2626' : '#059669', fontWeight: 600 }}>Balance: ₦{balance.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Assignments */}
+          {activeSection === 'Assignments' && (
+            <div style={{ background: 'white', borderRadius: 12, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, color: '#111827', marginBottom: 16 }}>Assignments</h3>
+              {studentData?.assignments?.length === 0 ? (
+                <p style={{ fontSize: 13, color: '#9CA3AF' }}>No assignments.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {studentData?.assignments?.map((a: any) => (
+                    <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#F9FAFB', borderRadius: 8 }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: '#111827' }}>{a.assignments?.title}</div>
+                        <div style={{ fontSize: 11, color: '#6B7280' }}>{a.assignments?.subjects?.name} · Due: {a.assignments?.due_date}</div>
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: a.submitted ? '#ECFDF5' : '#FEF3C7', color: a.submitted ? '#059669' : '#D97706' }}>
+                        {a.submitted ? 'Submitted' : 'Pending'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Profile */}
+          {activeSection === 'Profile' && selectedStudent?.student_profiles?.[0] && (
+            <div style={{ background: 'white', borderRadius: 12, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, color: '#111827', marginBottom: 16 }}>Profile</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                {[
+                  { label: 'Full Name', value: selectedStudent.full_name },
+                  { label: 'Student ID', value: selectedStudent.unique_id },
+                  { label: 'Username', value: selectedStudent.username || '—' },
+                  { label: 'Date of Birth', value: selectedStudent.student_profiles[0].date_of_birth || '—' },
+                  { label: 'Parent/Guardian', value: selectedStudent.student_profiles[0].parent_name || '—' },
+                  { label: 'Parent Phone', value: selectedStudent.student_profiles[0].parent_phone },
+                  { label: 'Parent Email', value: selectedStudent.student_profiles[0].parent_email || '—' },
+                  { label: 'Dismissal', value: selectedStudent.student_profiles[0].dismissal_method === 'alone' ? 'Goes home alone' : 'Parent pickup' },
+                ].map(f => (
+                  <div key={f.label} style={{ padding: '12px', background: '#F9FAFB', borderRadius: 8 }}>
+                    <div style={{ fontSize: 10, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{f.label}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: '#111827' }}>{f.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

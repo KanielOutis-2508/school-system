@@ -14,11 +14,16 @@ export async function GET() {
 
     const { data: student } = await supabase
       .from('users')
-      .select('*, student_profiles(*)')
+      .select('*, student_profiles(*), classes(name)')
       .eq('id', payload.id)
       .single();
 
-    return NextResponse.json({ student });
+    const result = student ? {
+      ...student,
+      class_name: student.classes?.name || null,
+    } : null;
+
+    return NextResponse.json({ student: result });
   } catch {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
